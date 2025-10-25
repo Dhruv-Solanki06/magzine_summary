@@ -55,6 +55,7 @@ export interface Author {
   }
   
   export interface RecordWithDetails extends Record {
+    relatedRecords: any;
     record_authors: {
       author_id: number;
       authors: Author;

@@ -1,5 +1,6 @@
 // components/common/Header.tsx
 import React from 'react';
+import { useRouter } from 'next/router';
 import { Bookmark, Star, User, Menu } from 'lucide-react';
 import SearchBar from '../browse/SearchBar';
 
@@ -16,6 +17,12 @@ export const Header: React.FC<HeaderProps> = ({
   showSearch = true,
   searchQuery,
 }) => {
+  const router = useRouter();
+
+  const handleNavigate = (path: string) => {
+    void router.push(path);
+  };
+
   return (
     <header className="bg-gray-900 text-white sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto px-6 py-4">
@@ -40,10 +47,18 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right side icons */}
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-gray-800 rounded-md transition-colors" title="Bookmarks">
+            <button
+              className="p-2 hover:bg-gray-800 rounded-md transition-colors"
+              title="Bookmarks"
+              onClick={() => handleNavigate('/bookmarks')}
+            >
               <Bookmark className="w-5 h-5" />
             </button>
-            <button className="p-2 hover:bg-gray-800 rounded-md transition-colors" title="Favorites">
+            <button
+              className="p-2 hover:bg-gray-800 rounded-md transition-colors"
+              title="Favorites"
+              onClick={() => handleNavigate('/favorites')}
+            >
               <Star className="w-5 h-5" />
             </button>
             <button className="p-2 hover:bg-gray-800 rounded-md transition-colors" title="Profile">
