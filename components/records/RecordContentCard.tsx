@@ -47,11 +47,7 @@ export const RecordContentCard: React.FC<RecordContentCardProps> = ({
 
         {/* Title and Author */}
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="px-3 py-1 bg-orange-100 text-orange-600 text-xs rounded-full">
-              Indexed
-            </span>
-          </div>
+          
           
           <h1 className="text-4xl font-bold text-gray-900 mb-3">
             {record.title_name || 'Untitled'}

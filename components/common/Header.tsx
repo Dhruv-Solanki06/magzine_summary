@@ -7,12 +7,14 @@ interface HeaderProps {
   onSearch: (query: string) => void;
   onFiltersClick: () => void;
   showSearch?: boolean;
+  searchQuery?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ 
-  onSearch, 
+export const Header: React.FC<HeaderProps> = ({
+  onSearch,
   onFiltersClick,
-  showSearch = true 
+  showSearch = true,
+  searchQuery,
 }) => {
   return (
     <header className="bg-gray-900 text-white sticky top-0 z-50 shadow-lg">
@@ -20,9 +22,6 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between gap-6">
           {/* Logo/Title */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-purple-600 rounded-md flex items-center justify-center">
-              <span className="text-white font-bold text-lg">M</span>
-            </div>
             <h1 className="text-xl font-bold whitespace-nowrap">
               Magazine Summary Portal
             </h1>
@@ -34,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({
               <SearchBar 
                 onSearch={onSearch}
                 onFiltersClick={onFiltersClick}
+                initialQuery={searchQuery}
               />
             </div>
           )}

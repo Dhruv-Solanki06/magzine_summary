@@ -1,33 +1,34 @@
-// pages/api/records/[id].ts
-
-import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { fetchRecordById } from '@/lib/server/records';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query;
-  if (req.method !== 'GET') {
+  const {
+    query: { id },
+    method,
+  } = req;
+
+  if (method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  const recordId = Number(Array.isArray(id) ? id[0] : id);
+
+  if (!Number.isFinite(recordId)) {
+    return res.status(400).json({ message: 'Invalid record id' });
+  }
+
   try {
-    const record = await prisma.record.findUnique({
-      where: { id: Number(id) },
-      include: {
-        record_tags: { include: { tag: true } },
-        magazine: true,
-      },
-    });
+    const record = await fetchRecordById(recordId);
 
     if (!record) {
       return res.status(404).json({ message: 'Record not found' });
     }
 
-    res.status(200).json(record);
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    return res.status(200).json(record);
   } catch (error) {
-    console.error('Error fetching record:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    console.error('API /api/records/[id] error:', error);
+    return res.status(500).json({ message: 'Failed to fetch record' });
   }
 }

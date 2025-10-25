@@ -67,7 +67,7 @@ export interface Author {
     conclusions: Conclusion[];
   }
   
-  export interface PaginatedResponse<T> {
+export interface PaginatedResponse<T> {
     data: T[];
     count: number;
     page: number;
@@ -86,3 +86,5 @@ export interface Author {
       end?: number;
     };
   }
+
+export type SortOption = 'title_asc' | 'title_desc' | 'newest' | 'oldest';

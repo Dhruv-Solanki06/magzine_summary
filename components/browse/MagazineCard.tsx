@@ -11,12 +11,14 @@ interface MagazineCardProps {
   record: RecordWithDetails;
   imagePosition: 'left' | 'right';
   onTagClick: (tagId: number) => void;
+  activeTagIds?: number[];
 }
 
 export const MagazineCard: React.FC<MagazineCardProps> = ({ 
   record, 
   imagePosition,
-  onTagClick 
+  onTagClick,
+  activeTagIds = [],
 }) => {
   const [imageUrl, setImageUrl] = useState<string>(FALLBACK_IMAGE);
   const router = useRouter(); // ✅ Initialize router
@@ -60,11 +62,7 @@ export const MagazineCard: React.FC<MagazineCardProps> = ({
 
         {/* Content */}
         <div className="flex-1 flex flex-col">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-full">
-              Indexed
-            </span>
-          </div>
+          
 
           <p className="text-sm text-gray-500 mb-1">{record.name}</p>
           <h3 className="text-xl font-bold text-gray-900 mb-2">
@@ -90,13 +88,17 @@ export const MagazineCard: React.FC<MagazineCardProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
-            {tags.slice(0, 3).map((tagRelation) => (
-              <TagPill 
-                key={tagRelation.tags.id} 
-                tag={tagRelation.tags}
-                onClick={onTagClick}
-              />
-            ))}
+            {tags.slice(0, 3).map((tagRelation) => {
+              const tagId = tagRelation.tags.id;
+              return (
+                <TagPill 
+                  key={tagId} 
+                  tag={tagRelation.tags}
+                  onClick={onTagClick}
+                  selected={activeTagIds.includes(tagId)}
+                />
+              );
+            })}
             {tags.length > 3 && (
               <span className="text-xs text-gray-500 self-center">
                 +{tags.length - 3} more
@@ -111,7 +113,7 @@ export const MagazineCard: React.FC<MagazineCardProps> = ({
               className="px-4 py-2 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 transition-colors flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
-              Read Full Summary
+              Summary
             </button>
 
             <a

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Loader2, ArrowLeft, Bookmark } from 'lucide-react';
 import { RecordWithDetails } from '@/types';
-import { fetchRecordById, fetchRecords } from '@/pages/api/records';
+import { fetchRecordById, fetchRecords } from '@/lib/api';
 import { fetchPexelsImage } from '@/lib/pexels';
 import Header from '@/components/common/Header';
 import RelatedSummaries from '@/components/records/RelatedSummariesCard';
@@ -238,9 +238,7 @@ export default function RecordDetailPage() {
           <section className="space-y-8">
             <div className="rounded-3xl bg-white/90 p-8 shadow-xl ring-1 ring-slate-100 backdrop-blur">
               <div className="mb-6 flex flex-wrap items-center gap-3">
-                <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-orange-600">
-                  Indexed
-                </span>
+                
                 {record.timestamp ? (
                   <span className="text-sm text-slate-500">
                     {new Date(record.timestamp).toLocaleDateString(undefined, {
@@ -259,14 +257,14 @@ export default function RecordDetailPage() {
               {summary ? (
                 <section className="mt-8 space-y-3">
                   <h2 className="text-lg font-semibold text-slate-900">Summary</h2>
-                  <p className="text-slate-600 leading-relaxed whitespace-pre-line">{summary}</p>
+                  <p className="text-slate-600 leading-relaxed whitespace-pre-line text-justify">{summary}</p>
                 </section>
               ) : null}
 
               {conclusion ? (
                 <section className="mt-8 space-y-3">
                   <h2 className="text-lg font-semibold text-slate-900">Conclusion</h2>
-                  <p className="text-slate-600 leading-relaxed whitespace-pre-line">{conclusion}</p>
+                  <p className="text-slate-600 leading-relaxed whitespace-pre-line text-justify">{conclusion}</p>
                 </section>
               ) : null}
 

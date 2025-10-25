@@ -1,209 +1,76 @@
-// api/api.ts - Supabase API calls
-import { createClient } from '@supabase/supabase-js';
-import { RecordWithDetails, PaginatedResponse, SearchFilters, Tag, Author } from '../../../types';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import type { SearchFilters, SortOption } from '@/types';
+import {
+  fetchAllAuthors,
+  fetchAllTags,
+  fetchRecordsWithFilters,
+} from '@/lib/server/records';
 
-const supabase = createClient("https://hzdjfyzrladnxjerisnm.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6ZGpmeXpybGFkbnhqZXJpc25tIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0ODg3NTAzMywiZXhwIjoyMDY0NDUxMDMzfQ.ahutTLsn1yeAzCEFzJpxxECyW4LX6AQo7euBAMMlXQ4");
+function parseNumberArray(value: string | string[] | undefined): number[] | undefined {
+  if (!value) return undefined;
 
-//const supabase = createClient(process.env.SUPABASE_URL || "", process.env.SUPABASE_SERVICE_ROLE_KEY || "");
-/**
- * Fetch paginated records with all related data
- */
-export async function fetchRecords(
-  page: number = 1,
-  pageSize: number = 20,
-  filters?: SearchFilters
-): Promise<PaginatedResponse<RecordWithDetails>> {
+  const rawValues = Array.isArray(value) ? value : value.split(',');
+  const numbers = rawValues
+    .map((item) => Number(item))
+    .filter((num) => Number.isFinite(num));
+
+  return numbers.length > 0 ? numbers : undefined;
+}
+
+function parseString(value: string | string[] | undefined): string | undefined {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function clampPage(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+function clampPageSize(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 20;
+  }
+  return Math.min(value, 50);
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  const { query } = req;
+
+  const page = clampPage(Number(query.page ?? 1));
+  const pageSize = clampPageSize(Number(query.limit ?? query.pageSize ?? 20));
+  const sort = (parseString(query.sort) ?? 'title_asc') as SortOption;
+
+  const filters: SearchFilters = {
+    searchQuery: parseString(query.search) ?? parseString(query.searchQuery),
+    magazine: parseString(query.magazine),
+    language: parseString(query.language),
+    tags: parseNumberArray(query.tags),
+    authors: parseNumberArray(query.authors),
+    yearRange: {
+      start: Number.isFinite(Number(query.yearStart))
+        ? Number(query.yearStart)
+        : undefined,
+      end: Number.isFinite(Number(query.yearEnd)) ? Number(query.yearEnd) : undefined,
+    },
+  };
+
+  if (!filters.yearRange?.start && !filters.yearRange?.end) {
+    filters.yearRange = undefined;
+  }
+
   try {
-    let query = supabase
-      .from('records')
-      .select(`
-        *,
-        record_authors (
-          author_id,
-          authors (*)
-        ),
-        record_tags (
-          tag_id,
-          tags (*)
-        ),
-        summaries (*),
-        conclusions (*)
-      `, { count: 'exact' });
-
-    // Apply search filter
-    if (filters?.searchQuery) {
-      query = query.or(
-        `title_name.ilike.%${filters.searchQuery}%,` +
-        `name.ilike.%${filters.searchQuery}%,` +
-        `summary.ilike.%${filters.searchQuery}%`
-      );
-    }
-
-    // Apply tag filter
-    if (filters?.tags && filters.tags.length > 0) {
-      // Create a subquery for records that have any of the specified tags
-      const { data: recordIds } = await supabase
-        .from('record_tags')
-        .select('record_id')
-        .in('tag_id', filters.tags);
-      
-      if (recordIds && recordIds.length > 0) {
-        const ids = recordIds.map(r => r.record_id);
-        query = query.in('id', ids);
-      }
-    }
-
-    // Apply author filter
-    if (filters?.authors && filters.authors.length > 0) {
-      const { data: recordIds } = await supabase
-        .from('record_authors')
-        .select('record_id')
-        .in('author_id', filters.authors);
-      
-      if (recordIds && recordIds.length > 0) {
-        const ids = recordIds.map(r => r.record_id);
-        query = query.in('id', ids);
-      }
-    }
-
-    // Apply magazine filter
-    if (filters?.magazine) {
-      query = query.ilike('name', `%${filters.magazine}%`);
-    }
-
-    // Apply language filter
-    if (filters?.language) {
-      query = query.eq('language', filters.language);
-    }
-
-    // Apply year range filter
-    if (filters?.yearRange?.start || filters?.yearRange?.end) {
-      if (filters.yearRange.start) {
-        query = query.gte('timestamp', `${filters.yearRange.start}-01-01`);
-      }
-      if (filters.yearRange.end) {
-        query = query.lte('timestamp', `${filters.yearRange.end}-12-31`);
-      }
-    }
-
-    // Sorting alphabetically by title_name
-    query = query.order('title_name', { ascending: true, nullsFirst: false });
-
-    // Pagination
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    query = query.range(from, to);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching records:', error);
-      throw error;
-    }
-
-    const totalPages = count ? Math.ceil(count / pageSize) : 0;
-
-    return {
-      data: data as RecordWithDetails[] || [],
-      count: count || 0,
-      page,
-      pageSize,
-      totalPages,
-    };
+    const response = await fetchRecordsWithFilters({ page, pageSize, filters, sort });
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
+    return res.status(200).json(response);
   } catch (error) {
-    console.error('Error in fetchRecords:', error);
-    throw error;
+    console.error('API /api/records error:', error);
+    return res.status(500).json({ message: 'Failed to load records' });
   }
 }
 
-/**
- * Fetch all tags
- */
-export async function fetchTags(): Promise<Tag[]> {
-  try {
-    const { data, error } = await supabase
-      .from('tags')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching tags:', error);
-    throw error;
-  }
-}
-
-/**
- * Fetch all authors
- */
-export async function fetchAuthors(): Promise<Author[]> {
-  try {
-    const { data, error } = await supabase
-      .from('authors')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching authors:', error);
-    throw error;
-  }
-}
-
-/**
- * Fetch a single record by ID with all details
- */
-export async function fetchRecordById(id: number): Promise<RecordWithDetails | null> {
-  try {
-    const { data, error } = await supabase
-      .from('records')
-      .select(`
-        *,
-        record_authors (
-          author_id,
-          authors (*)
-        ),
-        record_tags (
-          tag_id,
-          tags (*)
-        ),
-        summaries (*),
-        conclusions (*)
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-
-    return data as RecordWithDetails;
-  } catch (error) {
-    console.error('Error fetching record by ID:', error);
-    throw error;
-  }
-}
-
-/**
- * Search records by query
- */
-export async function searchRecords(
-  searchQuery: string,
-  page: number = 1,
-  pageSize: number = 20
-): Promise<PaginatedResponse<RecordWithDetails>> {
-  return fetchRecords(page, pageSize, { searchQuery });
-}
-
-/**
- * Filter records by tag
- */
-export async function filterRecordsByTag(
-  tagId: number,
-  page: number = 1,
-  pageSize: number = 20
-): Promise<PaginatedResponse<RecordWithDetails>> {
-  return fetchRecords(page, pageSize, { tags: [tagId] });
-}
+export { fetchAllAuthors, fetchAllTags, fetchRecordsWithFilters } from '@/lib/server/records';

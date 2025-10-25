@@ -23,11 +23,7 @@ const RelatedSummaryCard: React.FC<RelatedSummariesCardProps> = ({ record, image
             className="w-24 h-32 object-cover rounded-md"
           />
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-2 py-1 bg-orange-100 text-orange-600 text-xs rounded-full">
-                Indexed
-              </span>
-            </div>
+            
             <p className="text-xs text-gray-500 mb-1">{record.name}</p>
             <h3 className="text-sm font-bold text-gray-900 mb-1 line-clamp-2">
               {record.title_name || 'Untitled'}
