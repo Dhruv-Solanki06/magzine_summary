@@ -9,7 +9,7 @@ interface HeaderProps {
   showSearch?: boolean;
   searchQuery?: string;
 }
-
+// Header Component
 export const Header: React.FC<HeaderProps> = ({
   onSearch,
   onFiltersClick,
