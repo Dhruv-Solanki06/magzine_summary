@@ -40,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
               <SearchBar 
                 onSearch={onSearch}
                 onFiltersClick={onFiltersClick}
+                onSmartSearchClick={() => handleNavigate('/smart-search')}
                 initialQuery={searchQuery}
               />
             </div>

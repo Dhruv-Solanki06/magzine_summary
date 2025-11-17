@@ -287,7 +287,7 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
 
         <section className="mt-8 space-y-6">
           {records.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
               {records.map((record, index) => (
                 <MagazineCard
                   key={record.id}

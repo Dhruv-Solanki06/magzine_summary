@@ -1,4 +1,4 @@
-import { RecordWithDetails } from '@/types';
+import { RecordWithDetails, SmartSearchResponse, SmartSearchResult } from '@/types';
 
 type Primitive = string | number | boolean;
 type FilterValue = Primitive | Primitive[] | undefined;
@@ -61,4 +61,58 @@ export async function fetchRecordById(id: number): Promise<RecordWithDetails> {
   }
 
   return (await response.json()) as RecordWithDetails;
+}
+
+export interface SmartSearchResultSet {
+  results: SmartSearchResult[];
+  error?: string;
+}
+
+export async function smartSearch(query: string, limit = 20): Promise<SmartSearchResultSet> {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return { results: [] };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/smart-search?limit=${limit}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: trimmed }),
+    });
+
+    if (!response.ok) {
+      let message = `Smart search failed with status ${response.status}`;
+      try {
+        const errorBody = await response.json();
+        if (typeof errorBody?.message === 'string') {
+          message = errorBody.message;
+        } else {
+          message = JSON.stringify(errorBody);
+        }
+      } catch (parseError) {
+        try {
+          const fallbackText = await response.text();
+          if (fallbackText) {
+            message = fallbackText;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return { results: [], error: message };
+    }
+
+    const payload = (await response.json()) as SmartSearchResponse;
+    return { results: payload.results ?? [] };
+  } catch (error) {
+    console.error('Error performing smart search:', error);
+    return {
+      results: [],
+      error: error instanceof Error ? error.message : 'Unexpected smart search error',
+    };
+  }
 }

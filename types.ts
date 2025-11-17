@@ -76,7 +76,7 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   }
   
-  export interface SearchFilters {
+export interface SearchFilters {
     searchQuery?: string;
     tags?: number[];
     authors?: number[];
@@ -89,3 +89,25 @@ export interface PaginatedResponse<T> {
   }
 
 export type SortOption = 'title_asc' | 'title_desc' | 'newest' | 'oldest';
+
+export interface SmartSearchBreakdown {
+    cosineSimilarity: number;
+    bm25Rank: number;
+    properNounBoost: number;
+    fieldMatchBonus: number;
+    engagementScore: number;
+  }
+
+export interface SmartSearchResult {
+    id: number;
+    title_name: string;
+    authors: string;
+    summary: string;
+    pdf_url: string;
+    finalScore: number;
+    breakdown: SmartSearchBreakdown;
+  }
+
+export interface SmartSearchResponse {
+    results: SmartSearchResult[];
+  }
