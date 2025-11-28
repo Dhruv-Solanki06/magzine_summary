@@ -1,10 +1,14 @@
+// pages/index.tsx
 import React, { useCallback, useMemo, useState } from 'react';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
+
 import Header from '@/components/common/Header';
 import MagazineCard from '@/components/browse/MagazineCard';
 import Pagination from '@/components/browse/Pagination';
 import FiltersModal, { type FilterState } from '@/components/browse/FiltersModal';
+import SearchBar from '@/components/browse/SearchBar';
+
 import type {
   Author,
   RecordWithDetails,
@@ -42,8 +46,14 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
   const router = useRouter();
   const [isFiltersOpen, setFiltersOpen] = useState(false);
 
-  const tagIdSet = useMemo(() => new Set(appliedFilters.tags ?? []), [appliedFilters.tags]);
-  const authorIdSet = useMemo(() => new Set(appliedFilters.authors ?? []), [appliedFilters.authors]);
+  const tagIdSet = useMemo(
+    () => new Set(appliedFilters.tags ?? []),
+    [appliedFilters.tags],
+  );
+  const authorIdSet = useMemo(
+    () => new Set(appliedFilters.authors ?? []),
+    [appliedFilters.authors],
+  );
 
   const selectedTags = useMemo(
     () => tags.filter((tag) => tagIdSet.has(tag.id)),
@@ -55,44 +65,62 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
     [authors, authorIdSet],
   );
 
-  const updateQuery = useCallback((updates: Record<string, string | number | undefined>) => {
-    const nextQuery: Record<string, string> = {};
-    const current = router.query;
+  const updateQuery = useCallback(
+    (updates: Record<string, string | number | undefined>) => {
+      const nextQuery: Record<string, string> = {};
+      const current = router.query;
 
-    Object.entries(current).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        if (value.length > 0) {
-          nextQuery[key] = value[value.length - 1];
+      Object.entries(current).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          if (value.length > 0) {
+            nextQuery[key] = value[value.length - 1];
+          }
+        } else if (value !== undefined) {
+          nextQuery[key] = value;
         }
-      } else if (value !== undefined) {
-        nextQuery[key] = value;
-      }
-    });
+      });
 
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === undefined || value === '' || value === null) {
-        delete nextQuery[key];
-        return;
-      }
-      nextQuery[key] = String(value);
-    });
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === '' || value === null) {
+          delete nextQuery[key];
+          return;
+        }
+        nextQuery[key] = String(value);
+      });
 
-    router.push(
-      {
-        pathname: router.pathname,
-        query: nextQuery,
-      },
-      undefined,
-      { shallow: false, scroll: true },
-    );
-  }, [router]);
+      router.push(
+        {
+          pathname: router.pathname,
+          query: nextQuery,
+        },
+        undefined,
+        { shallow: false, scroll: true },
+      );
+    },
+    [router],
+  );
 
-  const handleSearch = useCallback((query: string) => {
-    updateQuery({
-      search: query || undefined,
-      page: 1,
-    });
-  }, [updateQuery]);
+  const handleSearch = useCallback(
+    (query: string) => {
+      updateQuery({
+        search: query || undefined,
+        page: 1,
+      });
+    },
+    [updateQuery],
+  );
+
+  // ✅ Only ONE smart search handler, right after handleSearch
+  const handleSmartSearchNav = useCallback(
+    (q: string) => {
+      const trimmed = q.trim();
+      void router.push({
+        pathname: '/smart-search',
+        query: trimmed ? { q: trimmed } : undefined,
+      });
+    },
+    [router],
+  );
 
   const handlePageChange = useCallback(
     (page: number) => {
@@ -104,32 +132,39 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
     [updateQuery],
   );
 
-  const handleTagClick = useCallback((tagId: number) => {
-    const updated = new Set(appliedFilters.tags ?? []);
-    if (updated.has(tagId)) {
-      updated.delete(tagId);
-    } else {
-      updated.add(tagId);
-    }
 
-    updateQuery({
-      tags: updated.size > 0 ? Array.from(updated).join(',') : undefined,
-      page: 1,
-    });
-  }, [appliedFilters.tags, updateQuery]);
+  const handleTagClick = useCallback(
+    (tagId: number) => {
+      const updated = new Set(appliedFilters.tags ?? []);
+      if (updated.has(tagId)) {
+        updated.delete(tagId);
+      } else {
+        updated.add(tagId);
+      }
 
-  const handleFiltersApply = useCallback((filters: FilterState) => {
-    updateQuery({
-      magazine: filters.magazine || undefined,
-      language: filters.language || undefined,
-      tags: filters.tags.length ? filters.tags.join(',') : undefined,
-      authors: filters.authors.length ? filters.authors.join(',') : undefined,
-      yearStart: filters.yearStart ?? undefined,
-      yearEnd: filters.yearEnd ?? undefined,
-      sort: filters.sort,
-      page: 1,
-    });
-  }, [updateQuery]);
+      updateQuery({
+        tags: updated.size > 0 ? Array.from(updated).join(',') : undefined,
+        page: 1,
+      });
+    },
+    [appliedFilters.tags, updateQuery],
+  );
+
+  const handleFiltersApply = useCallback(
+    (filters: FilterState) => {
+      updateQuery({
+        magazine: filters.magazine || undefined,
+        language: filters.language || undefined,
+        tags: filters.tags.length ? filters.tags.join(',') : undefined,
+        authors: filters.authors.length ? filters.authors.join(',') : undefined,
+        yearStart: filters.yearStart ?? undefined,
+        yearEnd: filters.yearEnd ?? undefined,
+        sort: filters.sort,
+        page: 1,
+      });
+    },
+    [updateQuery],
+  );
 
   const handleFiltersClear = useCallback(() => {
     updateQuery({
@@ -232,38 +267,53 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50">
-      <Header
-        onSearch={handleSearch}
-        onFiltersClick={() => setFiltersOpen(true)}
-        searchQuery={searchQuery}
-      />
+      {/* Navbar – no search here anymore */}
+      <Header />
 
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
+        {/* Title */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-4xl font-bold text-slate-900">Summaries A-Z</h2>
+            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
+              Summaries A–Z
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               Browse curated magazine summaries with intelligent filters and sorting.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="rounded-full bg-blue-500 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
-          >
-            Open Filters
-          </button>
         </div>
 
+        {/* Static search/filters panel */}
+        <div className="mt-6 rounded-3xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200 backdrop-blur">
+          <SearchBar
+            onSearch={handleSearch}
+            onFiltersClick={() => setFiltersOpen(true)}
+            onSmartSearchClick={handleSmartSearchNav}   // ✅ this is the only usage
+            initialQuery={searchQuery}
+            placeholder="Search summaries, authors, or tags..."
+          />
+        </div>
+
+
+        {/* Count row */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 sm:text-sm">
+          <span>{pagination.totalRecords} summaries</span>
+        </div>
+
+        {/* Active filter pills */}
         {activeFilters.length > 0 && (
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-slate-600">Active filters:</span>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-slate-600">
+              Active filters:
+            </span>
             {activeFilters.map((filter, index) => (
               <span
                 key={`${filter.label}-${filter.value}-${index}`}
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm"
               >
-                <span className="font-medium text-slate-500">{filter.label}:</span>
+                <span className="font-medium text-slate-500">
+                  {filter.label}:
+                </span>
                 <span>{filter.value}</span>
                 <button
                   type="button"
@@ -285,9 +335,10 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
           </div>
         )}
 
+        {/* Results grid */}
         <section className="mt-8 space-y-6">
           {records.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-stretch">
+            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
               {records.map((record, index) => (
                 <MagazineCard
                   key={record.id}
@@ -300,7 +351,9 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
             </div>
           ) : (
             <div className="rounded-3xl bg-white/90 p-12 text-center shadow-lg ring-1 ring-slate-200">
-              <h3 className="text-xl font-semibold text-slate-800">No summaries found</h3>
+              <h3 className="text-xl font-semibold text-slate-800">
+                No summaries found
+              </h3>
               <p className="mt-2 text-sm text-slate-500">
                 Try adjusting your filters or search terms to discover more content.
               </p>
@@ -331,13 +384,17 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
 };
 
 export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ query }) => {
-  const { fetchRecordsWithFilters, fetchAllTags, fetchAllAuthors } = await import('@/lib/server/records');
+  const { fetchRecordsWithFilters, fetchAllTags, fetchAllAuthors } = await import(
+    '@/lib/server/records'
+  );
 
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? DEFAULT_PAGE_SIZE);
   const sort = (query.sort ?? 'title_asc') as SortOption;
 
-  const parseNumberArray = (value: string | string[] | undefined): number[] | undefined => {
+  const parseNumberArray = (
+    value: string | string[] | undefined,
+  ): number[] | undefined => {
     if (!value) return undefined;
     const raw = Array.isArray(value) ? value : value.split(',');
     const parsed = raw
@@ -353,8 +410,12 @@ export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ 
     tags: parseNumberArray(query.tags),
     authors: parseNumberArray(query.authors),
     yearRange: {
-      start: typeof query.yearStart === 'string' ? Number(query.yearStart) : undefined,
-      end: typeof query.yearEnd === 'string' ? Number(query.yearEnd) : undefined,
+      start:
+        typeof query.yearStart === 'string'
+          ? Number(query.yearStart)
+          : undefined,
+      end:
+        typeof query.yearEnd === 'string' ? Number(query.yearEnd) : undefined,
     },
   };
 
@@ -394,7 +455,9 @@ export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ 
   const [recordsResponse, tagsList, authorsList] = await Promise.all([
     fetchRecordsWithFilters({
       page: Number.isFinite(page) ? page : 1,
-      pageSize: Number.isFinite(pageSize) ? Math.min(Math.max(pageSize, 1), 50) : DEFAULT_PAGE_SIZE,
+      pageSize: Number.isFinite(pageSize)
+        ? Math.min(Math.max(pageSize, 1), 50)
+        : DEFAULT_PAGE_SIZE,
       filters,
       sort,
     }),

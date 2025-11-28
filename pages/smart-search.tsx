@@ -104,7 +104,7 @@ const SmartSearchPage: NextPage = () => {
           content="Hybrid smart search combining vector similarity, BM25, and semantic boosts for magazine summaries."
         />
       </Head>
-      <Header onSearch={() => {}} onFiltersClick={() => {}} showSearch={false} />
+      <Header />
       <main className="bg-gray-100 min-h-screen pb-16">
         <div className="container mx-auto px-6 py-10">
           <section className="max-w-3xl mx-auto text-center mb-10">

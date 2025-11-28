@@ -2,20 +2,20 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { Bookmark, Star, User, Menu } from 'lucide-react';
-import SearchBar from '../browse/SearchBar';
 
 interface HeaderProps {
-  onSearch: (query: string) => void;
-  onFiltersClick: () => void;
+  // Kept optional so existing usages don't break,
+  // but they are no longer used here.
+  onSearch?: (query: string) => void;
+  onFiltersClick?: () => void;
   showSearch?: boolean;
   searchQuery?: string;
+  title?: string;
 }
+
 // Header Component
 export const Header: React.FC<HeaderProps> = ({
-  onSearch,
-  onFiltersClick,
-  showSearch = true,
-  searchQuery,
+  title = 'Magazine Summary Portal',
 }) => {
   const router = useRouter();
 
@@ -24,49 +24,51 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-gray-900 text-white sticky top-0 z-50 shadow-lg">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between gap-6">
+    <header className="sticky top-0 z-50 border-b border-gray-800 bg-gray-900/95 text-white backdrop-blur">
+      <div className="container mx-auto px-4 py-3 sm:px-6">
+        <div className="flex items-center justify-between gap-4">
           {/* Logo/Title */}
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold whitespace-nowrap">
-              Magazine Summary Portal
+          <div className="flex items-center gap-2">
+            <h1 className="whitespace-nowrap text-lg font-bold sm:text-xl">
+              {title}
             </h1>
           </div>
 
-          {/* Search Bar */}
-          {showSearch && (
-            <div className="flex-1 max-w-2xl">
-              <SearchBar 
-                onSearch={onSearch}
-                onFiltersClick={onFiltersClick}
-                onSmartSearchClick={() => handleNavigate('/smart-search')}
-                initialQuery={searchQuery}
-              />
-            </div>
-          )}
-
           {/* Right side icons */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
-              className="p-2 hover:bg-gray-800 rounded-md transition-colors"
+              className="rounded-md p-2 transition-colors hover:bg-gray-800"
               title="Bookmarks"
               onClick={() => handleNavigate('/bookmarks')}
             >
-              <Bookmark className="w-5 h-5" />
+              <Bookmark className="h-5 w-5" />
             </button>
             <button
-              className="p-2 hover:bg-gray-800 rounded-md transition-colors"
+              className="rounded-md p-2 transition-colors hover:bg-gray-800"
               title="Favorites"
               onClick={() => handleNavigate('/favorites')}
             >
-              <Star className="w-5 h-5" />
+              <Star className="h-5 w-5" />
             </button>
-            <button className="p-2 hover:bg-gray-800 rounded-md transition-colors" title="Profile">
-              <User className="w-5 h-5" />
+            <button
+              className="hidden rounded-md p-2 transition-colors hover:bg-gray-800 sm:inline-flex"
+              title="Profile"
+            >
+              <User className="h-5 w-5" />
             </button>
-            <button className="p-2 hover:bg-gray-800 rounded-md transition-colors" title="Menu">
-              <Menu className="w-5 h-5" />
+            {/* Mobile menu / profile entry point */}
+            <button
+              className="inline-flex rounded-md p-2 transition-colors hover:bg-gray-800 sm:hidden"
+              title="Menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            {/* On larger screens show menu icon too if you like */}
+            <button
+              className="hidden rounded-md p-2 transition-colors hover:bg-gray-800 sm:inline-flex"
+              title="Menu"
+            >
+              <Menu className="h-5 w-5" />
             </button>
           </div>
         </div>
