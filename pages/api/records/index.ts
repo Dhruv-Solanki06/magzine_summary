@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const page = clampPage(Number(query.page ?? 1));
   const pageSize = clampPageSize(Number(query.limit ?? query.pageSize ?? 20));
-  const sort = (parseString(query.sort) ?? 'title_asc') as SortOption;
+  const sort = (parseString(query.sort) ?? 'random') as SortOption;
 
   const filters: SearchFilters = {
     searchQuery: parseString(query.search) ?? parseString(query.searchQuery),

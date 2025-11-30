@@ -88,7 +88,7 @@ export interface SearchFilters {
     };
   }
 
-export type SortOption = 'title_asc' | 'title_desc' | 'newest' | 'oldest';
+export type SortOption = 'random' | 'title_asc' | 'title_desc' | 'newest' | 'oldest';
 
 export interface SmartSearchBreakdown {
     cosineSimilarity: number;
