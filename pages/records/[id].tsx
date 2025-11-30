@@ -78,7 +78,7 @@ export default function RecordDetailPage() {
       // const tagNames = (recordData.record_tags?.[0]?.tags?.name + ' ' + recordData.title_name ||  recordData.record_tags?.[0]?.tags?.name || recordData.title_name || 'magazine cover');
       // const tagNames = recordData.record_tags?.[0]?.tags?.name;
       const tagNames = recordData.title_name;
-      const mainQuery = tagNames;
+      const mainQuery = tagNames || recordData.name || 'magazine cover';
       const mainImage = await getCachedPexelsImage(mainQuery);
       setImageUrl(mainImage);
 
