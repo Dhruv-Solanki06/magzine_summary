@@ -23,6 +23,7 @@ interface FiltersModalProps {
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'random', label: 'Random order' },
   { value: 'title_asc', label: 'Title A-Z' },
   { value: 'title_desc', label: 'Title Z-A' },
   { value: 'newest', label: 'Newest First' },
@@ -36,7 +37,7 @@ const DEFAULT_FILTERS: FilterState = {
   yearEnd: undefined,
   tags: [],
   authors: [],
-  sort: 'title_asc',
+  sort: 'random',
 };
 
 function mergeFilters(base: FilterState, overrides: Partial<FilterState>): FilterState {

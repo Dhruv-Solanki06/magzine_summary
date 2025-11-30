@@ -390,7 +390,7 @@ export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ 
 
   const page = Number(query.page ?? 1);
   const pageSize = Number(query.pageSize ?? DEFAULT_PAGE_SIZE);
-  const sort = (query.sort ?? 'title_asc') as SortOption;
+  const sort = (query.sort ?? 'random') as SortOption;
 
   const parseNumberArray = (
     value: string | string[] | undefined,

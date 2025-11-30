@@ -77,7 +77,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </div>
 
         {/* Smart search pill on the right */}
-        {onSmartSearchClick && (
+        {/* {onSmartSearchClick && (
           <button
             type="button"
             onClick={handleSmartSearchClick}
@@ -86,7 +86,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <span>Try Smart Search</span>
             <Sparkles className="h-4 w-4" />
           </button>
-        )}
+        )} */}
       </div>
     </div>
   );

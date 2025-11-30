@@ -73,7 +73,12 @@ export default function RecordDetailPage() {
 
       setRecord(recordData);
 
-      const mainQuery = recordData.title_name || recordData.name || 'magazine cover';
+      // const mainQuery = recordData.conclusion || recordData.summary || recordData.title_name || recordData.name || 'magazine cover';
+      // Build query from record tags for more relevant image results
+      // const tagNames = (recordData.record_tags?.[0]?.tags?.name + ' ' + recordData.title_name ||  recordData.record_tags?.[0]?.tags?.name || recordData.title_name || 'magazine cover');
+      // const tagNames = recordData.record_tags?.[0]?.tags?.name;
+      const tagNames = recordData.title_name;
+      const mainQuery = tagNames;
       const mainImage = await getCachedPexelsImage(mainQuery);
       setImageUrl(mainImage);
 

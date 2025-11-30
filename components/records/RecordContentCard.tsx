@@ -3,6 +3,7 @@
 import React from 'react';
 import { Bookmark, BookmarkCheck, Download, Eye, Heart } from 'lucide-react';
 import { RecordWithDetails } from '@/types';
+import { buildPdfViewUrl } from './pdfLinks';
 import TagPill from '../browse/TagPill';
 
 interface RecordContentCardProps {
@@ -22,6 +23,8 @@ const RecordContentCard: React.FC<RecordContentCardProps> = ({
   areAuthorsFavorited = false,
   onFavoriteAuthorsToggle,
 }) => {
+  const pdfViewUrl = buildPdfViewUrl(record);
+
   const authors =
     record.record_authors && record.record_authors.length > 0
       ? record.record_authors.map((ra) => ra.authors.name).join(', ')
@@ -112,9 +115,9 @@ const RecordContentCard: React.FC<RecordContentCardProps> = ({
       )}
 
       <div className="flex flex-col gap-2 pt-4 sm:flex-row sm:flex-wrap sm:gap-3">
-        {record.pdf_url && (
+        {pdfViewUrl && (
           <a
-            href={record.pdf_url}
+            href={pdfViewUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-500 px-5 py-3 text-sm font-medium text-white transition hover:bg-blue-600"

@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
 import { RecordWithDetails } from '@/types';
+import { buildPdfViewUrl } from './pdfLinks';
 
 interface MagazineDetailsCardProps {
   record: RecordWithDetails;
@@ -8,6 +9,8 @@ interface MagazineDetailsCardProps {
 }
 
 const MagazineDetailsCard: React.FC<MagazineDetailsCardProps> = ({ record, imageUrl }) => {
+  const pdfViewUrl = buildPdfViewUrl(record);
+
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-lg ring-1 ring-slate-100 lg:sticky lg:top-24">
       <div className="overflow-hidden rounded-t-3xl">
@@ -66,10 +69,26 @@ const MagazineDetailsCard: React.FC<MagazineDetailsCardProps> = ({ record, image
         )}
 
         <div className="pt-4">
-          <button className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-600">
-            <FileText className="h-4 w-4" />
-            Read Full PDF
-          </button>
+          {pdfViewUrl ? (
+            <a
+              href={pdfViewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-600"
+            >
+              <FileText className="h-4 w-4" />
+              Read Full PDF
+            </a>
+          ) : (
+            <button
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-slate-200 px-4 py-2.5 text-sm font-medium text-slate-500 cursor-not-allowed"
+              disabled
+              type="button"
+            >
+              <FileText className="h-4 w-4" />
+              PDF unavailable
+            </button>
+          )}
         </div>
       </div>
     </div>
