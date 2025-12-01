@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type {
   Author,
   PaginatedResponse,
+  Record as DbRecordRow,
   RecordWithDetails,
   SearchFilters,
   SortOption,
@@ -18,6 +19,8 @@ interface RecordsRequest {
 
 const RECORDS_CACHE_TTL = 1000 * 60 * 5; // 5 minutes
 const LOOKUP_CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+
+export type DbRecord = DbRecordRow;
 
 let cachedClient: SupabaseClient | null = null;
 
@@ -40,6 +43,56 @@ function getSupabaseClient(): SupabaseClient {
   });
 
   return cachedClient;
+}
+
+async function query<T>(sql: string, params: unknown[]): Promise<{ rows: T[] }> {
+  const supabase = getSupabaseClient();
+
+  if (sql.includes('WHERE id = $1')) {
+    const { data, error } = await supabase.from('records').select('*').eq('id', params[0]);
+
+    if (error) {
+      console.error('Error running record lookup query:', error);
+      throw error;
+    }
+
+    return { rows: (data ?? []) as T[] };
+  }
+
+  if (sql.includes('WHERE name = $1') && sql.includes('volume = $2') && sql.includes('number = $3')) {
+    const { data, error } = await supabase
+      .from('records')
+      .select('*')
+      .eq('name', params[0] as string)
+      .eq('volume', params[1] as string)
+      .eq('number', params[2] as string);
+
+    if (error) {
+      console.error('Error running same-issue records query:', error);
+      throw error;
+    }
+
+    const parsePageStart = (value: string | null | undefined): number => {
+      if (!value) return 999999;
+      const match = value.match(/[0-9]+/);
+      if (!match) return 999999;
+      const parsed = Number(match[0]);
+      return Number.isFinite(parsed) ? parsed : 999999;
+    };
+
+    const sorted = (data ?? []).sort((a: any, b: any) => {
+      const aPage = parsePageStart(a?.page_numbers);
+      const bPage = parsePageStart(b?.page_numbers);
+      if (aPage !== bPage) {
+        return aPage - bPage;
+      }
+      return (a?.id ?? 0) - (b?.id ?? 0);
+    });
+
+    return { rows: sorted as T[] };
+  }
+
+  throw new Error('Unsupported query');
 }
 
 function buildCacheKey({ page, pageSize, filters, sort }: RecordsRequest): string {
@@ -412,7 +465,7 @@ export async function fetchRecordsWithFilters({
   return response;
 }
 
-export async function fetchRecordById(id: number): Promise<RecordWithDetails | null> {
+export async function fetchRecordWithDetailsById(id: number): Promise<RecordWithDetails | null> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -441,6 +494,44 @@ export async function fetchRecordById(id: number): Promise<RecordWithDetails | n
   }
 
   return data ? (sanitiseDeep(data) as RecordWithDetails) : null;
+}
+
+export async function fetchRecordById(id: number): Promise<DbRecord | null> {
+  const { rows } = await query<DbRecord>(
+    'SELECT * FROM records WHERE id = $1',
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+export async function fetchRecordsFromSameIssue(recordId: number): Promise<DbRecord[]> {
+  const current = await fetchRecordById(recordId);
+  if (!current) return [];
+
+  const { name, volume, number } = current;
+
+  if (!name || !volume || !number) {
+    return [];
+  }
+
+  const { rows } = await query<DbRecord>(
+    `
+      SELECT *
+      FROM records
+      WHERE name = $1
+        AND volume = $2
+        AND number = $3
+      ORDER BY
+        COALESCE(
+          NULLIF(regexp_replace(page_numbers, '[^0-9].*$', '', ''), '')::int,
+          999999
+        ),
+        id
+    `,
+    [name, volume, number],
+  );
+
+  return rows;
 }
 
 async function fetchLookup<T>(table: 'tags' | 'authors', ttl: number): Promise<T[]> {

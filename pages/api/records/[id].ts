@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { fetchRecordById } from '@/lib/server/records';
+import { fetchRecordWithDetailsById } from '@/lib/server/records';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const {
@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const record = await fetchRecordById(recordId);
+    const record = await fetchRecordWithDetailsById(recordId);
 
     if (!record) {
       return res.status(404).json({ message: 'Record not found' });
