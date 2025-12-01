@@ -240,6 +240,7 @@ export const getServerSideProps: GetServerSideProps<RecordDetailPageProps> = asy
     (await fetchRecordWithDetailsById(id)) ??
     ({
       ...baseRecord,
+      relatedRecords: [],
       record_authors: [],
       record_tags: [],
       summaries: [],
