@@ -266,7 +266,7 @@ export const getServerSideProps: GetServerSideProps<RecordDetailPageProps> = asy
           filters: { magazine: record.name },
         });
 
-  let pool = (baseResponse?.data ?? []).filter((item) => item.id !== id);
+  const pool = (baseResponse?.data ?? []).filter((item) => item.id !== id);
 
   if (pool.length < 6) {
     const fallbackResponse = await fetchRecordsWithFilters({
