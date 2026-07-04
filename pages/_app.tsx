@@ -3,6 +3,7 @@ import type { AppProps } from "next/app";
 import { Inter } from "next/font/google";
 
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import RouteProgress from "@/components/common/RouteProgress";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -14,6 +15,7 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <AuthProvider>
       <div className={`${inter.variable} font-sans`}>
+        <RouteProgress />
         <Component {...pageProps} />
       </div>
     </AuthProvider>
