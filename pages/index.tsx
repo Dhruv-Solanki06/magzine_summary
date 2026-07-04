@@ -1,469 +1,349 @@
-// pages/index.tsx
-import React, { useCallback, useMemo, useState } from 'react';
+// pages/index.tsx — Article repository browse (home)
+import React, { useCallback, useMemo } from 'react';
+import Head from 'next/head';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
+import { X } from 'lucide-react';
 
 import Header from '@/components/common/Header';
-import MagazineCard from '@/components/browse/MagazineCard';
-import Pagination from '@/components/browse/Pagination';
-import FiltersModal, { type FilterState } from '@/components/browse/FiltersModal';
 import SearchBar from '@/components/browse/SearchBar';
+import FilterBar, { type FilterBarValue } from '@/components/browse/FilterBar';
+import ArticleGrid from '@/components/browse/ArticleGrid';
+import Pagination from '@/components/browse/Pagination';
 
 import type {
   Author,
+  MagazineWithStats,
   RecordWithDetails,
-  SearchFilters,
-  Tag,
   SortOption,
+  Tag,
 } from '@/types';
+import type { LanguageFacet } from '@/lib/server/records';
+import { formatCount } from '@/lib/format';
+import {
+  HERITAGE_ASSETS,
+  SITE_DESCRIPTION,
+  SITE_DOMAIN,
+  SITE_NAME,
+  SITE_URL,
+} from '@/lib/brand';
 
 interface BrowsePageProps {
   records: RecordWithDetails[];
-  pagination: {
-    page: number;
-    totalPages: number;
-    totalRecords: number;
-    pageSize: number;
-  };
-  appliedFilters: SearchFilters;
-  sort: SortOption;
+  pagination: { page: number; totalPages: number; totalRecords: number; pageSize: number };
+  magazines: MagazineWithStats[];
+  languages: LanguageFacet[];
+  value: FilterBarValue;
+  selectedTags: Tag[];
+  selectedAuthors: Author[];
   searchQuery: string;
-  tags: Tag[];
-  authors: Author[];
 }
 
 const DEFAULT_PAGE_SIZE = 20;
 
+type QueryPatch = Record<string, string | number | undefined>;
+
 const BrowsePage: NextPage<BrowsePageProps> = ({
   records,
   pagination,
-  appliedFilters,
-  sort,
+  magazines,
+  languages,
+  value,
+  selectedTags,
+  selectedAuthors,
   searchQuery,
-  tags,
-  authors,
 }) => {
   const router = useRouter();
-  const [isFiltersOpen, setFiltersOpen] = useState(false);
-
-  const tagIdSet = useMemo(
-    () => new Set(appliedFilters.tags ?? []),
-    [appliedFilters.tags],
-  );
-  const authorIdSet = useMemo(
-    () => new Set(appliedFilters.authors ?? []),
-    [appliedFilters.authors],
-  );
-
-  const selectedTags = useMemo(
-    () => tags.filter((tag) => tagIdSet.has(tag.id)),
-    [tags, tagIdSet],
-  );
-
-  const selectedAuthors = useMemo(
-    () => authors.filter((author) => authorIdSet.has(author.id)),
-    [authors, authorIdSet],
-  );
 
   const updateQuery = useCallback(
-    (updates: Record<string, string | number | undefined>) => {
-      const nextQuery: Record<string, string> = {};
-      const current = router.query;
-
-      Object.entries(current).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          if (value.length > 0) {
-            nextQuery[key] = value[value.length - 1];
-          }
-        } else if (value !== undefined) {
-          nextQuery[key] = value;
+    (patch: QueryPatch, resetPage = true) => {
+      const next: Record<string, string> = {};
+      Object.entries(router.query).forEach(([k, v]) => {
+        if (Array.isArray(v)) {
+          if (v.length) next[k] = v[v.length - 1];
+        } else if (v !== undefined) {
+          next[k] = v;
         }
       });
-
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === undefined || value === '' || value === null) {
-          delete nextQuery[key];
-          return;
-        }
-        nextQuery[key] = String(value);
+      if (resetPage) delete next.page;
+      Object.entries(patch).forEach(([k, v]) => {
+        if (v === undefined || v === '' || v === null) delete next[k];
+        else next[k] = String(v);
       });
-
-      router.push(
-        {
-          pathname: router.pathname,
-          query: nextQuery,
-        },
-        undefined,
-        { shallow: false, scroll: true },
-      );
+      void router.push({ pathname: '/', query: next }, undefined, { scroll: true });
     },
     [router],
   );
 
-  const handleSearch = useCallback(
-    (query: string) => {
-      updateQuery({
-        search: query || undefined,
-        page: 1,
-      });
+  const handleFilterChange = useCallback(
+    (patch: Partial<FilterBarValue>) => {
+      const q: QueryPatch = {};
+      if ('magazineId' in patch) q.magazineId = patch.magazineId;
+      if ('language' in patch) q.language = patch.language;
+      if ('yearStart' in patch) q.yearStart = patch.yearStart;
+      if ('yearEnd' in patch) q.yearEnd = patch.yearEnd;
+      if ('sort' in patch) q.sort = patch.sort;
+      if ('tagIds' in patch) q.tags = patch.tagIds?.length ? patch.tagIds.join(',') : undefined;
+      if ('authorIds' in patch)
+        q.authors = patch.authorIds?.length ? patch.authorIds.join(',') : undefined;
+      updateQuery(q);
     },
     [updateQuery],
   );
 
-  // ✅ Only ONE smart search handler, right after handleSearch
-  const handleSmartSearchNav = useCallback(
-    (q: string) => {
-      const trimmed = q.trim();
-      void router.push({
-        pathname: '/smart-search',
-        query: trimmed ? { q: trimmed } : undefined,
-      });
-    },
-    [router],
-  );
-
-  const handlePageChange = useCallback(
-    (page: number) => {
-      updateQuery({ page });
-      if (typeof window !== 'undefined') {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    },
-    [updateQuery],
-  );
-
+  const handleReset = useCallback(() => {
+    void router.push({ pathname: '/' }, undefined, { scroll: true });
+  }, [router]);
 
   const handleTagClick = useCallback(
     (tagId: number) => {
-      const updated = new Set(appliedFilters.tags ?? []);
-      if (updated.has(tagId)) {
-        updated.delete(tagId);
+      const set = new Set(value.tagIds);
+      if (set.has(tagId)) {
+        set.delete(tagId);
       } else {
-        updated.add(tagId);
+        set.add(tagId);
       }
-
-      updateQuery({
-        tags: updated.size > 0 ? Array.from(updated).join(',') : undefined,
-        page: 1,
-      });
+      updateQuery({ tags: set.size ? Array.from(set).join(',') : undefined });
     },
-    [appliedFilters.tags, updateQuery],
+    [value.tagIds, updateQuery],
   );
 
-  const handleFiltersApply = useCallback(
-    (filters: FilterState) => {
-      updateQuery({
-        magazine: filters.magazine || undefined,
-        language: filters.language || undefined,
-        tags: filters.tags.length ? filters.tags.join(',') : undefined,
-        authors: filters.authors.length ? filters.authors.join(',') : undefined,
-        yearStart: filters.yearStart ?? undefined,
-        yearEnd: filters.yearEnd ?? undefined,
-        sort: filters.sort,
-        page: 1,
-      });
-    },
-    [updateQuery],
-  );
-
-  const handleFiltersClear = useCallback(() => {
-    updateQuery({
-      magazine: undefined,
-      language: undefined,
-      tags: undefined,
-      authors: undefined,
-      yearStart: undefined,
-      yearEnd: undefined,
-      sort: undefined,
-      page: 1,
-    });
-  }, [updateQuery]);
-
-  const activeFilters = useMemo(() => {
-    const filters: { label: string; value: string; onRemove: () => void }[] = [];
-
-    if (searchQuery) {
-      filters.push({
-        label: 'Search',
-        value: searchQuery,
-        onRemove: () => handleSearch(''),
-      });
-    }
-    if (appliedFilters.magazine) {
-      filters.push({
-        label: 'Magazine',
-        value: appliedFilters.magazine,
-        onRemove: () => updateQuery({ magazine: undefined, page: 1 }),
-      });
-    }
-    if (appliedFilters.language) {
-      filters.push({
-        label: 'Language',
-        value: appliedFilters.language,
-        onRemove: () => updateQuery({ language: undefined, page: 1 }),
-      });
-    }
-    if (appliedFilters.yearRange?.start || appliedFilters.yearRange?.end) {
-      const start = appliedFilters.yearRange?.start ?? '—';
-      const end = appliedFilters.yearRange?.end ?? '—';
-      filters.push({
+  const activeChips = useMemo(() => {
+    const chips: { label: string; value: string; onRemove: () => void }[] = [];
+    if (searchQuery)
+      chips.push({ label: 'Search', value: searchQuery, onRemove: () => updateQuery({ search: undefined }) });
+    const mag = magazines.find((m) => m.id === value.magazineId);
+    if (mag) chips.push({ label: 'Magazine', value: mag.name, onRemove: () => updateQuery({ magazineId: undefined }) });
+    if (value.language)
+      chips.push({ label: 'Language', value: value.language, onRemove: () => updateQuery({ language: undefined }) });
+    if (value.yearStart || value.yearEnd)
+      chips.push({
         label: 'Years',
-        value: `${start} - ${end}`,
-        onRemove: () =>
-          updateQuery({
-            yearStart: undefined,
-            yearEnd: undefined,
-            page: 1,
-          }),
+        value: `${value.yearStart ?? '…'} – ${value.yearEnd ?? '…'}`,
+        onRemove: () => updateQuery({ yearStart: undefined, yearEnd: undefined }),
       });
-    }
-    selectedTags.forEach((tag) => {
-      filters.push({
-        label: 'Tag',
-        value: tag.name,
-        onRemove: () => handleTagClick(tag.id),
-      });
-    });
-    selectedAuthors.forEach((author) => {
-      filters.push({
+    selectedTags.forEach((t) =>
+      chips.push({ label: 'Topic', value: t.name, onRemove: () => handleTagClick(t.id) }),
+    );
+    selectedAuthors.forEach((a) =>
+      chips.push({
         label: 'Author',
-        value: author.name,
+        value: a.name,
         onRemove: () => {
-          const updated = new Set(appliedFilters.authors ?? []);
-          if (updated.has(author.id)) {
-            updated.delete(author.id);
-          }
-          updateQuery({
-            authors: updated.size ? Array.from(updated).join(',') : undefined,
-            page: 1,
-          });
+          const set = new Set(value.authorIds);
+          set.delete(a.id);
+          updateQuery({ authors: set.size ? Array.from(set).join(',') : undefined });
         },
-      });
-    });
+      }),
+    );
+    return chips;
+  }, [searchQuery, magazines, value, selectedTags, selectedAuthors, updateQuery, handleTagClick]);
 
-    return filters;
-  }, [
-    appliedFilters.magazine,
-    appliedFilters.language,
-    appliedFilters.yearRange,
-    appliedFilters.authors,
-    handleSearch,
-    handleTagClick,
-    updateQuery,
-    selectedTags,
-    selectedAuthors,
-    searchQuery,
-  ]);
-
-  const modalInitialFilters: FilterState = {
-    magazine: appliedFilters.magazine ?? '',
-    language: appliedFilters.language ?? '',
-    yearStart: appliedFilters.yearRange?.start,
-    yearEnd: appliedFilters.yearRange?.end,
-    tags: appliedFilters.tags ?? [],
-    authors: appliedFilters.authors ?? [],
-    sort,
-  };
+  const hasActive =
+    activeChips.length > 0 || value.sort !== 'title_asc';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50">
-      {/* Navbar – no search here anymore */}
-      <Header />
+    <>
+      <Head>
+        <title>{`${SITE_NAME} | Cultural Article Archive`}</title>
+        <meta
+          name="description"
+          content={SITE_DESCRIPTION}
+        />
+        <meta property="og:title" content={`${SITE_NAME} | Cultural Article Archive`} />
+        <meta property="og:description" content={SITE_DESCRIPTION} />
+        <meta property="og:url" content={SITE_URL} />
+        <meta property="og:image" content={`${SITE_URL}${HERITAGE_ASSETS[0].src}`} />
+      </Head>
+      <div className="min-h-screen bg-white">
+        <Header />
 
-      <main className="container mx-auto px-4 py-6 sm:px-6 sm:py-8">
-        {/* Title */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-900 sm:text-4xl">
-              Summaries A–Z
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Browse curated magazine summaries with intelligent filters and sorting.
-            </p>
-          </div>
-        </div>
-
-        {/* Static search/filters panel */}
-        <div className="mt-6 rounded-3xl bg-white/90 p-4 shadow-sm ring-1 ring-slate-200 backdrop-blur">
-          <SearchBar
-            onSearch={handleSearch}
-            onFiltersClick={() => setFiltersOpen(true)}
-            onSmartSearchClick={handleSmartSearchNav}   // ✅ this is the only usage
-            initialQuery={searchQuery}
-            placeholder="Search summaries, authors, or tags..."
-          />
-        </div>
-
-
-        {/* Count row */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 sm:text-sm">
-          <span>{pagination.totalRecords} summaries</span>
-        </div>
-
-        {/* Active filter pills */}
-        {activeFilters.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-slate-600">
-              Active filters:
-            </span>
-            {activeFilters.map((filter, index) => (
-              <span
-                key={`${filter.label}-${filter.value}-${index}`}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm"
+        <main className="w-full px-4 pb-16 pt-8 sm:px-6 lg:px-10">
+          <section className="grid gap-6 border-b border-black/[0.06] pb-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-end">
+            <div className="max-w-2xl">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-black/45">
+                {SITE_DOMAIN}
+              </p>
+              <h1
+                className="mt-2 text-[34px] font-bold leading-[1.05] tracking-[-0.8px] text-black/92 sm:text-[44px]"
+                style={{ fontFamily: 'var(--font-heading)' }}
               >
-                <span className="font-medium text-slate-500">
-                  {filter.label}:
-                </span>
-                <span>{filter.value}</span>
-                <button
-                  type="button"
-                  onClick={filter.onRemove}
-                  className="rounded-full bg-slate-100 px-1.5 py-0.5 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
-                  aria-label={`Remove ${filter.label} filter`}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={handleFiltersClear}
-              className="text-sm font-medium text-blue-600 hover:text-blue-700"
-            >
-              Clear all
-            </button>
-          </div>
-        )}
+                {SITE_NAME}
+              </h1>
+              <p className="mt-3 text-[15px] leading-[1.65] text-black/58 sm:text-[16px]">
+                A research archive for cultural articles, journals, manuscripts and
+                literary scholarship from the Indic knowledge tradition.
+              </p>
+              <p className="mt-3 text-[14px] leading-[1.55] text-black/50">
+                {formatCount(pagination.totalRecords)} summarised articles across{' '}
+                {magazines.length} magazines &amp; journals. Search full text, then filter by
+                topic, author, language and era.
+              </p>
+            </div>
 
-        {/* Results grid */}
-        <section className="mt-8 space-y-6">
-          {records.length > 0 ? (
-            <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
-              {records.map((record, index) => (
-                <MagazineCard
-                  key={record.id}
-                  record={record}
-                  imagePosition={index % 2 === 0 ? 'left' : 'right'}
-                  onTagClick={handleTagClick}
-                  activeTagIds={Array.from(tagIdSet)}
+            <div className="grid h-48 grid-cols-3 gap-2 overflow-hidden rounded-[14px] bg-black/[0.03] p-2 ring-1 ring-black/[0.06] sm:h-56">
+              {HERITAGE_ASSETS.slice(0, 3).map((asset, index) => (
+                <div
+                  key={asset.src}
+                  role="img"
+                  aria-label={asset.alt}
+                  className="min-h-0 rounded-[10px] bg-cover bg-center"
+                  style={{
+                    backgroundImage: `linear-gradient(to top, rgba(0,0,0,0.35), rgba(0,0,0,0)), url("${asset.src}")`,
+                    transform: index === 1 ? 'translateY(18px)' : undefined,
+                  }}
                 />
               ))}
             </div>
-          ) : (
-            <div className="rounded-3xl bg-white/90 p-12 text-center shadow-lg ring-1 ring-slate-200">
-              <h3 className="text-xl font-semibold text-slate-800">
-                No summaries found
-              </h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Try adjusting your filters or search terms to discover more content.
-              </p>
+          </section>
+
+          {/* Search + filters */}
+          <div className="mt-6 flex flex-col gap-3">
+            <SearchBar
+              initialQuery={searchQuery}
+              onSearch={(q) => updateQuery({ search: q || undefined })}
+              placeholder="Search titles, authors, summaries and full text…"
+            />
+            <FilterBar
+              magazines={magazines}
+              languages={languages}
+              value={value}
+              selectedTags={selectedTags}
+              selectedAuthors={selectedAuthors}
+              allowRelevance={Boolean(searchQuery)}
+              onChange={handleFilterChange}
+              onReset={handleReset}
+              hasActiveFilters={hasActive}
+            />
+          </div>
+
+          {/* Active chips */}
+          {activeChips.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {activeChips.map((chip, i) => (
+                <span
+                  key={`${chip.label}-${i}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white py-1 pl-3 pr-1.5 text-[13px] text-black/70"
+                >
+                  <span className="text-black/40">{chip.label}:</span>
+                  <span className="max-w-[220px] truncate font-medium">{chip.value}</span>
+                  <button
+                    type="button"
+                    onClick={chip.onRemove}
+                    aria-label={`Remove ${chip.label}`}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-black/40 hover:bg-black/[0.06] hover:text-black/70"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              ))}
             </div>
           )}
-        </section>
 
-        <Pagination
-          currentPage={pagination.page}
-          totalPages={pagination.totalPages}
-          totalRecords={pagination.totalRecords}
-          pageSize={pagination.pageSize}
-          onPageChange={handlePageChange}
-        />
-      </main>
+          {/* Count */}
+          <p className="mt-6 text-sm font-medium text-black/54">
+            {formatCount(pagination.totalRecords)} {pagination.totalRecords === 1 ? 'article' : 'articles'}
+            {searchQuery && (
+              <>
+                {' '}for <span className="text-black/92">“{searchQuery}”</span>
+              </>
+            )}
+          </p>
 
-      <FiltersModal
-        open={isFiltersOpen}
-        onClose={() => setFiltersOpen(false)}
-        onApply={handleFiltersApply}
-        onClear={handleFiltersClear}
-        tags={tags}
-        authors={authors}
-        initialFilters={modalInitialFilters}
-      />
-    </div>
+          {/* Results */}
+          <div className="mt-4">
+            <ArticleGrid
+              records={records}
+              onTagClick={handleTagClick}
+              activeTagIds={value.tagIds}
+              onReset={handleReset}
+            />
+          </div>
+
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalRecords={pagination.totalRecords}
+            pageSize={pagination.pageSize}
+            onPageChange={(p) => {
+              updateQuery({ page: p }, false);
+              if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </main>
+      </div>
+    </>
   );
 };
 
+function parseNumberArray(value: string | string[] | undefined): number[] {
+  if (!value) return [];
+  const raw = Array.isArray(value) ? value : value.split(',');
+  return raw.map(Number).filter((n) => Number.isFinite(n));
+}
+
+function str(value: string | string[] | undefined): string | undefined {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ query }) => {
-  const { fetchRecordsWithFilters, fetchAllTags, fetchAllAuthors } = await import(
-    '@/lib/server/records'
-  );
+  const {
+    fetchRecordsWithFilters,
+    fetchAllMagazinesWithStats,
+    fetchLanguages,
+    getTagsByIds,
+    getAuthorsByIds,
+  } = await import('@/lib/server/records');
 
-  const page = Number(query.page ?? 1);
-  const pageSize = Number(query.pageSize ?? DEFAULT_PAGE_SIZE);
-  const sort = (query.sort ?? 'random') as SortOption;
+  const page = Math.max(1, Number(query.page ?? 1) || 1);
+  const searchQuery = str(query.search)?.trim() || '';
+  const magazineId = Number(str(query.magazineId));
+  const language = str(query.language);
+  const yearStart = Number(str(query.yearStart));
+  const yearEnd = Number(str(query.yearEnd));
+  const tagIds = parseNumberArray(query.tags);
+  const authorIds = parseNumberArray(query.authors);
 
-  const parseNumberArray = (
-    value: string | string[] | undefined,
-  ): number[] | undefined => {
-    if (!value) return undefined;
-    const raw = Array.isArray(value) ? value : value.split(',');
-    const parsed = raw
-      .map((item) => Number(item))
-      .filter((num) => Number.isFinite(num));
-    return parsed.length ? parsed : undefined;
+  const defaultSort: SortOption = searchQuery ? 'relevance' : 'title_asc';
+  const sort = (str(query.sort) as SortOption) || defaultSort;
+
+  const filters = {
+    searchQuery: searchQuery || undefined,
+    magazineId: Number.isFinite(magazineId) ? magazineId : undefined,
+    language,
+    tags: tagIds.length ? tagIds : undefined,
+    authors: authorIds.length ? authorIds : undefined,
+    yearRange:
+      Number.isFinite(yearStart) || Number.isFinite(yearEnd)
+        ? {
+            start: Number.isFinite(yearStart) ? yearStart : undefined,
+            end: Number.isFinite(yearEnd) ? yearEnd : undefined,
+          }
+        : undefined,
   };
 
-  const filters: SearchFilters = {
-    searchQuery: typeof query.search === 'string' ? query.search : undefined,
-    magazine: typeof query.magazine === 'string' ? query.magazine : undefined,
-    language: typeof query.language === 'string' ? query.language : undefined,
-    tags: parseNumberArray(query.tags),
-    authors: parseNumberArray(query.authors),
-    yearRange: {
-      start:
-        typeof query.yearStart === 'string'
-          ? Number(query.yearStart)
-          : undefined,
-      end:
-        typeof query.yearEnd === 'string' ? Number(query.yearEnd) : undefined,
-    },
-  };
+  const [recordsResponse, magazines, languages, selectedTags, selectedAuthors] =
+    await Promise.all([
+      fetchRecordsWithFilters({ page, pageSize: DEFAULT_PAGE_SIZE, filters, sort }),
+      fetchAllMagazinesWithStats(),
+      fetchLanguages(),
+      getTagsByIds(tagIds),
+      getAuthorsByIds(authorIds),
+    ]);
 
-  if (!filters.yearRange?.start && !filters.yearRange?.end) {
-    filters.yearRange = undefined;
-  }
-
-  const serializableFilters: SearchFilters = {};
-  if (filters.searchQuery !== undefined) {
-    serializableFilters.searchQuery = filters.searchQuery;
-  }
-  if (filters.magazine !== undefined) {
-    serializableFilters.magazine = filters.magazine;
-  }
-  if (filters.language !== undefined) {
-    serializableFilters.language = filters.language;
-  }
-  if (filters.tags !== undefined) {
-    serializableFilters.tags = filters.tags;
-  }
-  if (filters.authors !== undefined) {
-    serializableFilters.authors = filters.authors;
-  }
-  if (filters.yearRange) {
-    const yearRange: NonNullable<SearchFilters['yearRange']> = {};
-    if (filters.yearRange.start !== undefined) {
-      yearRange.start = filters.yearRange.start;
-    }
-    if (filters.yearRange.end !== undefined) {
-      yearRange.end = filters.yearRange.end;
-    }
-    if (Object.keys(yearRange).length > 0) {
-      serializableFilters.yearRange = yearRange;
-    }
-  }
-
-  const [recordsResponse, tagsList, authorsList] = await Promise.all([
-    fetchRecordsWithFilters({
-      page: Number.isFinite(page) ? page : 1,
-      pageSize: Number.isFinite(pageSize)
-        ? Math.min(Math.max(pageSize, 1), 50)
-        : DEFAULT_PAGE_SIZE,
-      filters,
+  // Strip `undefined` (Next cannot serialize it in props).
+  const value: FilterBarValue = JSON.parse(
+    JSON.stringify({
+      magazineId: filters.magazineId,
+      language: language ?? undefined,
+      yearStart: Number.isFinite(yearStart) ? yearStart : undefined,
+      yearEnd: Number.isFinite(yearEnd) ? yearEnd : undefined,
       sort,
+      tagIds,
+      authorIds,
     }),
-    fetchAllTags(),
-    fetchAllAuthors(),
-  ]);
+  );
 
   return {
     props: {
@@ -474,11 +354,12 @@ export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ 
         totalRecords: recordsResponse.count,
         pageSize: recordsResponse.pageSize,
       },
-      appliedFilters: serializableFilters,
-      sort,
-      searchQuery: filters.searchQuery ?? '',
-      tags: tagsList,
-      authors: authorsList,
+      magazines,
+      languages,
+      value,
+      selectedTags,
+      selectedAuthors,
+      searchQuery,
     },
   };
 };
