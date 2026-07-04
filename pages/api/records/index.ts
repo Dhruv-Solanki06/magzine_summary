@@ -1,19 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { SearchFilters, SortOption } from '@/types';
-import {
-  fetchAllAuthors,
-  fetchAllTags,
-  fetchRecordsWithFilters,
-} from '@/lib/server/records';
+import { fetchRecordsWithFilters } from '@/lib/server/records';
 
 function parseNumberArray(value: string | string[] | undefined): number[] | undefined {
   if (!value) return undefined;
-
   const rawValues = Array.isArray(value) ? value : value.split(',');
-  const numbers = rawValues
-    .map((item) => Number(item))
-    .filter((num) => Number.isFinite(num));
-
+  const numbers = rawValues.map((item) => Number(item)).filter((n) => Number.isFinite(n));
   return numbers.length > 0 ? numbers : undefined;
 }
 
@@ -27,9 +19,7 @@ function clampPage(value: number): number {
 }
 
 function clampPageSize(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) {
-    return 20;
-  }
+  if (!Number.isFinite(value) || value <= 0) return 20;
   return Math.min(value, 50);
 }
 
@@ -40,21 +30,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { query } = req;
-
   const page = clampPage(Number(query.page ?? 1));
   const pageSize = clampPageSize(Number(query.limit ?? query.pageSize ?? 20));
-  const sort = (parseString(query.sort) ?? 'random') as SortOption;
+  const sort = (parseString(query.sort) ?? 'title_asc') as SortOption;
+
+  const magazineId = Number(parseString(query.magazineId));
 
   const filters: SearchFilters = {
     searchQuery: parseString(query.search) ?? parseString(query.searchQuery),
-    magazine: parseString(query.magazine),
+    magazineId: Number.isFinite(magazineId) ? magazineId : undefined,
     language: parseString(query.language),
     tags: parseNumberArray(query.tags),
     authors: parseNumberArray(query.authors),
     yearRange: {
-      start: Number.isFinite(Number(query.yearStart))
-        ? Number(query.yearStart)
-        : undefined,
+      start: Number.isFinite(Number(query.yearStart)) ? Number(query.yearStart) : undefined,
       end: Number.isFinite(Number(query.yearEnd)) ? Number(query.yearEnd) : undefined,
     },
   };
@@ -72,5 +61,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Failed to load records' });
   }
 }
-
-export { fetchAllAuthors, fetchAllTags, fetchRecordsWithFilters } from '@/lib/server/records';
