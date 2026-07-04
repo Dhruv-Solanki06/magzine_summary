@@ -1,0 +1,30 @@
+# docker-compose.yml
+# `docker compose` automatically reads the .env file in this directory for both
+# ${VAR} interpolation (build args below) and is also passed to the container at
+# runtime via env_file. So one .env drives both build-time NEXT_PUBLIC_* values
+# and server-only secrets (SUPABASE_SERVICE_ROLE_KEY, CLOUDINARY_*, etc.).
+
+services:
+  web:
+    image: ${IMAGE_NAME:-dhruvsh-1729/magzine-summary}:${TAG:-latest}
+    container_name: magzine-summary
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY: ${NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY:-}
+        NEXT_PUBLIC_PEXELS_API_KEY: ${NEXT_PUBLIC_PEXELS_API_KEY:-}
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
