@@ -6,7 +6,7 @@
 import type { PaginatedResponse, RecordWithDetails, SortOption } from '@/types';
 import { SUBJECTS as TAXONOMY } from '@/lib/taxonomy';
 import {
-  RECORD_SELECT,
+  RECORD_LIST_SELECT,
   finalizeRecords,
   getSupabaseClient,
 } from './records';
@@ -147,7 +147,7 @@ export async function fetchRecordsBySubject({
 
   let query: any = supabase
     .from('records')
-    .select(`${RECORD_SELECT}, ${linkTable}!inner(${linkCol})`, { count: 'exact' })
+    .select(`${RECORD_LIST_SELECT}, ${linkTable}!inner(${linkCol})`, { count: 'exact' })
     .eq(`${linkTable}.${linkCol}`, linkVal);
 
   const term = search?.trim();
