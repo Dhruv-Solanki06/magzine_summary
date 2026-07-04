@@ -7,11 +7,12 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 deploy.sh
-README.md
-*.md
 .vscode
 .idea
-# Never ship secrets into the image/build context.
-.env
-.env.*
-!.env.example
+
+# NOTE: .env is intentionally NOT ignored. The builder stage needs it so
+# `next build` can inline NEXT_PUBLIC_* into the client bundle (no enumerated
+# build args to forget). The final runtime image is assembled from the
+# standalone output only and never COPYs .env, so secrets are not shipped in
+# the published image. If you build on a machine without .env, provide the
+# NEXT_PUBLIC_* values some other way before building.
