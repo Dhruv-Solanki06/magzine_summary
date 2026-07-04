@@ -60,7 +60,8 @@ function formatValue(value: unknown): string {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     res.setHeader("Allow", ["GET"]);
-    return res.status(405).json({ error: "Method Not Allowed" });
+    res.status(405).json({ error: "Method Not Allowed" });
+    return;
   }
 
   try {
@@ -70,7 +71,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const v = req.query.v ? formatValue(req.query.v) : undefined;
 
     if (!id || !id.endsWith(".pdf")) {
-      return res.status(400).json({ error: "Missing or invalid 'id' (must include .pdf)" });
+      res.status(400).json({ error: "Missing or invalid 'id' (must include .pdf)" });
+      return;
     }
 
     const cloudUrl = cloudinary.url(id, {
@@ -83,7 +85,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const resp = await fetch(cloudUrl);
     if (!resp.ok || !resp.body) {
-      return res.status(resp.status).end(await resp.text());
+      res.status(resp.status).end(await resp.text());
+      return;
     }
 
     res.setHeader("Content-Type", "application/pdf");
