@@ -11,8 +11,10 @@ export interface StoredFavoriteAuthor {
   name: string;
 }
 
-export const BOOKMARK_STORAGE_KEY = 'magazine_summary_bookmarks';
-export const FAVORITE_AUTHORS_STORAGE_KEY = 'magazine_summary_favorite_authors';
+export const BOOKMARK_STORAGE_KEY = 'aryan_culture_bookmarks';
+export const FAVORITE_AUTHORS_STORAGE_KEY = 'aryan_culture_favorite_authors';
+const LEGACY_BOOKMARK_STORAGE_KEY = 'magazine_summary_bookmarks';
+const LEGACY_FAVORITE_AUTHORS_STORAGE_KEY = 'magazine_summary_favorite_authors';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';
@@ -68,7 +70,9 @@ function normaliseFavoriteAuthors(data: unknown): StoredFavoriteAuthor[] {
 export function readBookmarks(): StoredBookmark[] {
   if (!isBrowser()) return [];
   try {
-    const raw = window.localStorage.getItem(BOOKMARK_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(BOOKMARK_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_BOOKMARK_STORAGE_KEY);
     if (!raw) return [];
     return normaliseBookmarks(JSON.parse(raw));
   } catch (error) {
@@ -89,7 +93,9 @@ export function writeBookmarks(bookmarks: StoredBookmark[]): void {
 export function readFavoriteAuthors(): StoredFavoriteAuthor[] {
   if (!isBrowser()) return [];
   try {
-    const raw = window.localStorage.getItem(FAVORITE_AUTHORS_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(FAVORITE_AUTHORS_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_FAVORITE_AUTHORS_STORAGE_KEY);
     if (!raw) return [];
     return normaliseFavoriteAuthors(JSON.parse(raw));
   } catch (error) {
