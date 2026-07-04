@@ -1,6 +1,21 @@
 import "@/styles/globals.css";
 import type { AppProps } from "next/app";
+import { Inter } from "next/font/google";
+
+import { AuthProvider } from "@/components/auth/AuthProvider";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export default function App({ Component, pageProps }: AppProps) {
-  return <Component {...pageProps} />;
+  return (
+    <AuthProvider>
+      <div className={`${inter.variable} font-sans`}>
+        <Component {...pageProps} />
+      </div>
+    </AuthProvider>
+  );
 }
