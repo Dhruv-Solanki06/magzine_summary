@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
 
-const CACHE_DIR = path.join(os.tmpdir(), 'magazine_summary_cache');
+const CACHE_DIR = path.join(os.tmpdir(), 'aryan_culture_cache');
 
 async function ensureCacheDir() {
   try {
