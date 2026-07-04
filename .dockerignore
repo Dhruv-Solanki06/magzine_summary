@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+npm-debug.log*
+Dockerfile
+.dockerignore
+docker-compose.yml
+deploy.sh
+README.md
+*.md
+.vscode
+.idea
+# Never ship secrets into the image/build context.
+.env
+.env.*
+!.env.example
