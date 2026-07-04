@@ -1,297 +1,180 @@
-'use client';
-
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+// pages/records/[id].tsx — single article detail (SSR)
+import React, { useCallback, useMemo } from 'react';
+import Head from 'next/head';
+import Link from 'next/link';
+import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, BookOpen } from 'lucide-react';
+
 import Header from '@/components/common/Header';
 import MagazineDetailsCard from '@/components/records/MagazineDetailsCard';
 import RecordContentCard from '@/components/records/RecordContentCard';
-import RelatedSummaries from '@/components/records/RelatedSummariesCard';
-
-import { fetchRecordById, fetchRecords } from '@/lib/api';
-import { fetchPexelsImage } from '@/lib/pexels';
-import {
-  readBookmarks,
-  writeBookmarks,
-  readFavoriteAuthors,
-  writeFavoriteAuthors,
-  type StoredBookmark,
-  type StoredFavoriteAuthor,
-} from '@/lib/storage';
+import IssueNavigator from '@/components/records/IssueNavigator';
+import PdfViewerCard from '@/components/records/PdfViewerCard';
+import RecordInsightPanel from '@/components/records/RecordInsightPanel';
+import ArticleGrid from '@/components/browse/ArticleGrid';
 import type { RecordWithDetails } from '@/types';
+import type { VolumeIssueNavItem } from '@/lib/server/records';
+import { magazineName } from '@/lib/format';
+import { useBookmarks, useFavoriteAuthors } from '@/lib/useLibrary';
+import { SITE_NAME } from '@/lib/brand';
 
-const FALLBACK_IMAGE = 'https://via.placeholder.com/400x500?text=No+Image';
-const RELATED_PAGE_SIZE = 18;
-
-const imageCache = new Map<string, string>();
-
-async function getCachedPexelsImage(query: string): Promise<string> {
-  if (imageCache.has(query)) {
-    return imageCache.get(query)!;
-  }
-  const img = await fetchPexelsImage(query);
-  if (img) {
-    imageCache.set(query, img);
-  }
-  return img ?? FALLBACK_IMAGE;
+interface RecordDetailProps {
+  record: RecordWithDetails;
+  sameIssue: RecordWithDetails[];
+  volumeIssues: VolumeIssueNavItem[];
+  related: RecordWithDetails[];
 }
 
-export default function RecordDetailPage() {
+const RecordDetailPage: NextPage<RecordDetailProps> = ({
+  record,
+  sameIssue,
+  volumeIssues,
+  related,
+}) => {
   const router = useRouter();
-  const { id } = router.query;
+  const { isBookmarked, toggle: toggleBookmark } = useBookmarks();
+  const { isFavorite, toggle: toggleFavorite } = useFavoriteAuthors();
 
-  const [record, setRecord] = useState<RecordWithDetails | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>(FALLBACK_IMAGE);
-  const [candidateRecords, setCandidateRecords] = useState<RecordWithDetails[]>([]);
-  const [relatedImageUrls, setRelatedImageUrls] = useState<Map<number, string>>(new Map());
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
-  const [favoriteAuthorIds, setFavoriteAuthorIds] = useState<number[]>([]);
-
-  const numericId = useMemo(() => {
-    if (!id) return null;
-    const value = Array.isArray(id) ? id[0] : id;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }, [id]);
-
-  const loadRecord = useCallback(async () => {
-    if (!numericId) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const recordData = await fetchRecordById(numericId);
-      if (!recordData) {
-        setError('Record not found');
-        setRecord(null);
-        return;
-      }
-
-      setRecord(recordData);
-
-      // const mainQuery = recordData.conclusion || recordData.summary || recordData.title_name || recordData.name || 'magazine cover';
-      // Build query from record tags for more relevant image results
-      // const tagNames = (recordData.record_tags?.[0]?.tags?.name + ' ' + recordData.title_name ||  recordData.record_tags?.[0]?.tags?.name || recordData.title_name || 'magazine cover');
-      // const tagNames = recordData.record_tags?.[0]?.tags?.name;
-      const tagNames = recordData.title_name;
-      const mainQuery = tagNames || recordData.name || 'magazine cover';
-      const mainImage = await getCachedPexelsImage(mainQuery);
-      setImageUrl(mainImage);
-
-      const primaryTagIds =
-        recordData.record_tags?.map((relation) => relation.tag_id ?? relation.tags.id) ?? [];
-
-      const baseResponse =
-        primaryTagIds.length > 0
-          ? await fetchRecords(1, RELATED_PAGE_SIZE, { tags: [primaryTagIds[0]] })
-          : await fetchRecords(1, RELATED_PAGE_SIZE, { magazine: recordData.name });
-
-      const pool = (baseResponse?.data ?? []).filter((item) => item.id !== numericId);
-
-      if (pool.length < 6) {
-        const fallbackResponse = await fetchRecords(1, RELATED_PAGE_SIZE);
-        const fallbackData = (fallbackResponse?.data ?? []).filter((item) => item.id !== numericId);
-        const seen = new Set(pool.map((item) => item.id));
-        fallbackData.forEach((item) => {
-          if (!seen.has(item.id)) {
-            pool.push(item);
-            seen.add(item.id);
-          }
-        });
-      }
-
-      setCandidateRecords([...pool]);
-
-      if (pool.length > 0) {
-        const map = new Map<number, string>();
-        const limitedPool = pool.slice(0, 12);
-        const resolved = await Promise.all(
-          limitedPool.map(async (item) => {
-            const query = item.title_name || item.name || 'magazine cover';
-            const img = await getCachedPexelsImage(query);
-            return [item.id, img] as const;
-          }),
-        );
-        resolved.forEach(([itemId, img]) => {
-          map.set(itemId, img ?? FALLBACK_IMAGE);
-        });
-        setRelatedImageUrls(map);
-      } else {
-        setRelatedImageUrls(new Map());
-      }
-    } catch (err) {
-      console.error('Error loading record:', err);
-      setError('Failed to load record. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  }, [numericId]);
-
-  useEffect(() => {
-    void loadRecord();
-  }, [loadRecord]);
-
-  useEffect(() => {
-    if (!record) {
-      return;
-    }
-    const storedBookmarks = readBookmarks();
-    setIsBookmarked(storedBookmarks.some((entry) => entry.id === record.id));
-
-    const storedFavorites = readFavoriteAuthors();
-    setFavoriteAuthorIds(storedFavorites.map((entry) => entry.id));
-  }, [record]);
-
-  const handleBookmarkToggle = useCallback(() => {
-    if (!record) return;
-    const bookmarks = readBookmarks();
-    const exists = bookmarks.some((entry) => entry.id === record.id);
-    let updated: StoredBookmark[];
-    if (exists) {
-      updated = bookmarks.filter((entry) => entry.id !== record.id);
-    } else {
-      updated = [
-        ...bookmarks,
-        {
-          id: record.id,
-          title: record.title_name || record.name || 'Untitled',
-          magazine: record.name,
-        },
-      ];
-    }
-    writeBookmarks(updated);
-    setIsBookmarked(!exists);
-  }, [record]);
-
-  const handleFavoriteAuthorsToggle = useCallback(() => {
-    if (!record || !record.record_authors || record.record_authors.length === 0) {
-      return;
-    }
-    const storedFavorites = readFavoriteAuthors();
-    const authorEntries = record.record_authors
-      .map((relation) => ({
-        id: relation.authors?.id ?? relation.author_id,
-        name: relation.authors?.name ?? `Author ${relation.author_id}`,
-      }))
-      .filter((entry): entry is StoredFavoriteAuthor =>
-        typeof entry.id === 'number' && typeof entry.name === 'string',
-      );
-    const authorIds = authorEntries.map((entry) => entry.id);
-    const allStored = authorIds.every((authorId) =>
-      storedFavorites.some((entry) => entry.id === authorId),
-    );
-    let updated: StoredFavoriteAuthor[];
-    if (allStored) {
-      updated = storedFavorites.filter((entry) => !authorIds.includes(entry.id));
-    } else {
-      updated = [...storedFavorites];
-      authorEntries.forEach((entry) => {
-        if (!updated.some((existing) => existing.id === entry.id)) {
-          updated.push(entry);
-        }
-      });
-    }
-    writeFavoriteAuthors(updated);
-    setFavoriteAuthorIds(updated.map((entry) => entry.id));
-  }, [record]);
-
-  const areAuthorsFavorited = useMemo(() => {
-    if (!record || !record.record_authors || record.record_authors.length === 0) return false;
-    const ids = record.record_authors
-      .map((relation) => relation.authors?.id ?? relation.author_id)
-      .filter((id): id is number => typeof id === 'number');
-    if (ids.length === 0) return false;
-    return ids.every((idValue) => favoriteAuthorIds.includes(idValue));
-  }, [record, favoriteAuthorIds]);
-
-  const relatedImageFor = useCallback(
-    (item: RecordWithDetails) => relatedImageUrls.get(item.id) ?? FALLBACK_IMAGE,
-    [relatedImageUrls],
+  const authorEntries = useMemo(
+    () =>
+      (record.record_authors ?? [])
+        .map((ra) => ({ id: ra.authors?.id ?? ra.author_id, name: ra.authors?.name }))
+        .filter((a): a is { id: number; name: string } => Boolean(a.id && a.name)),
+    [record.record_authors],
   );
 
-  const handleSearch = (query: string) => {
-    router.push(`/browse?search=${encodeURIComponent(query)}`);
-  };
+  const authorsFavorited =
+    authorEntries.length > 0 && authorEntries.every((a) => isFavorite(a.id));
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50">
-        <Header onSearch={handleSearch} onFiltersClick={() => undefined} showSearch={false} />
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          <span className="ml-3 text-slate-600">Loading record...</span>
-        </div>
-      </div>
-    );
-  }
+  const handleFavoriteAuthors = useCallback(() => {
+    if (authorEntries.length === 0) return;
+    // Toggle all as a group based on current state.
+    authorEntries.forEach((a) => {
+      const currentlyFav = isFavorite(a.id);
+      if (authorsFavorited && currentlyFav) toggleFavorite(a);
+      else if (!authorsFavorited && !currentlyFav) toggleFavorite(a);
+    });
+  }, [authorEntries, authorsFavorited, isFavorite, toggleFavorite]);
 
-  if (error || !record) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50">
-        <Header onSearch={handleSearch} onFiltersClick={() => undefined} showSearch={false} />
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-4 py-16 text-center">
-          <div className="rounded-3xl bg-white/90 p-8 shadow-xl ring-1 ring-slate-200">
-            <h2 className="text-2xl font-semibold text-slate-900">Something went wrong</h2>
-            <p className="mt-2 text-slate-600">
-              {error || 'We could not find that summary. Please try again later.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="mt-6 inline-flex items-center justify-center rounded-full bg-blue-500 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-600"
-            >
-              Back to Browse
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const bookmarked = isBookmarked(record.id);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50">
-      <Header onSearch={handleSearch} onFiltersClick={() => undefined} showSearch={false} />
+    <>
+      <Head>
+        <title>{`${record.title_name || 'Article'} | ${SITE_NAME}`}</title>
+        <meta name="description" content={(record.summary || '').slice(0, 160)} />
+      </Head>
+      <div className="min-h-screen bg-white">
+        <Header />
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:py-10">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="inline-flex w-fit items-center gap-2 text-sm font-medium text-blue-600 transition hover:text-blue-700"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Browse
-        </button>
-
-        <div className="grid gap-6 lg:grid-cols-4">
-          <div className="lg:col-span-1">
-            <MagazineDetailsCard record={record} imageUrl={imageUrl} />
+        <main className="mx-auto max-w-[1280px] px-4 pb-16 pt-4 sm:px-6 sm:pt-6 lg:px-10">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 text-sm font-medium text-black/58 transition hover:border-black/20 hover:text-black/86"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <Link
+              href="/"
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-black/[0.04] px-3 text-sm font-medium text-black/58 transition hover:bg-black/[0.07] hover:text-black/86"
+            >
+              <BookOpen className="h-4 w-4" />
+              Browse articles
+            </Link>
           </div>
-          <div className="lg:col-span-3">
-            <RecordContentCard
-              record={record}
-              onTagClick={(tagId) => router.push(`/browse?tag=${tagId}`)}
-              isBookmarked={isBookmarked}
-              onBookmarkToggle={handleBookmarkToggle}
-              areAuthorsFavorited={areAuthorsFavorited}
-              onFavoriteAuthorsToggle={handleFavoriteAuthorsToggle}
-            />
-          </div>
-        </div>
 
-        <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-lg ring-1 ring-slate-100 sm:p-8">
-          <RelatedSummaries
-            current={record}
-            allRecords={candidateRecords}
-            getImageUrl={relatedImageFor}
-            limit={6}
-          />
-        </div>
-      </main>
-    </div>
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
+            <div className="min-w-0 space-y-5">
+              <RecordContentCard
+                record={record}
+                onTagClick={(tagId) => router.push(`/?tags=${tagId}`)}
+                isBookmarked={bookmarked}
+                onBookmarkToggle={() =>
+                  toggleBookmark({
+                    id: record.id,
+                    title: record.title_name || 'Untitled article',
+                    magazine: magazineName(record),
+                  })
+                }
+                areAuthorsFavorited={authorsFavorited}
+                onFavoriteAuthorsToggle={handleFavoriteAuthors}
+              />
+
+              <RecordInsightPanel record={record} />
+
+              <IssueNavigator
+                record={record}
+                sameIssue={sameIssue}
+                volumeIssues={volumeIssues}
+              />
+
+              <PdfViewerCard record={record} />
+            </div>
+
+            <aside className="space-y-4 lg:sticky lg:top-24">
+              <MagazineDetailsCard record={record} />
+            </aside>
+          </div>
+
+          {/* Related */}
+          {related.length > 0 && (
+            <section className="mt-10 border-t border-black/[0.06] pt-8">
+              <div className="mb-4">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-black/40">
+                  Continue reading
+                </p>
+                <h2
+                  className="mt-1 text-[21px] font-bold tracking-[-0.3px] text-black/92"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  Related articles
+                </h2>
+              </div>
+              <ArticleGrid records={related} onTagClick={(t) => router.push(`/?tags=${t}`)} />
+            </section>
+          )}
+        </main>
+      </div>
+    </>
   );
-}
+};
+
+export const getServerSideProps: GetServerSideProps<RecordDetailProps> = async ({ params }) => {
+  const {
+    fetchRecordWithDetailsById,
+    fetchRecordsFromSameIssue,
+    fetchRecordsWithFilters,
+    fetchVolumeIssueSequence,
+  } = await import('@/lib/server/records');
+
+  const id = Number(Array.isArray(params?.id) ? params?.id[0] : params?.id);
+  if (!Number.isFinite(id)) return { notFound: true };
+
+  const record = await fetchRecordWithDetailsById(id);
+  if (!record) return { notFound: true };
+
+  const [sameIssueAll, volumeIssues, relatedResponse] = await Promise.all([
+    fetchRecordsFromSameIssue(record),
+    fetchVolumeIssueSequence(record),
+    (() => {
+      const firstTag = record.record_tags?.[0]?.tags?.id;
+      const filters = firstTag
+        ? { tags: [firstTag] }
+        : { magazineId: record.magazine_id ?? undefined };
+      return fetchRecordsWithFilters({ page: 1, pageSize: 9, filters, sort: 'random' });
+    })(),
+  ]);
+
+  const sameIssue = sameIssueAll.some((r) => r.id === id)
+    ? sameIssueAll
+    : [record, ...sameIssueAll];
+  const related = relatedResponse.data.filter((r) => r.id !== id).slice(0, 6);
+
+  return { props: { record, sameIssue, volumeIssues, related } };
+};
+
+export default RecordDetailPage;
