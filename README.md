@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# Aryan Culture
+
+Aryan Culture (`aryanculture.org`) is a Next.js archive for cultural articles, journals, manuscripts, and related scholarship.
 
 ## Getting Started
 
@@ -16,9 +18,38 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## Authentication setup
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+This app uses Supabase Auth for app-user login, signup, account verification, and password reset. It does not use or modify the existing backend `users` table.
+
+1. Add the public auth env vars in `.env`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=<same value as SUPABASE_URL>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>
+```
+
+For older Supabase projects, `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works instead of `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+
+2. In Supabase Auth URL settings, add your site URL and redirect URL:
+
+```text
+http://localhost:3000
+http://localhost:3000/auth/callback
+```
+
+For production, add:
+
+```text
+https://aryanculture.org
+https://aryanculture.org/auth/callback
+```
+
+Email/password verification and password reset are handled by Supabase Auth emails. The existing `MAILEROO_API_KEY` is not required for this default flow; using Maileroo for these auth emails would require a custom email-sending flow or SMTP setup.
+
+Optional Google login: enable Google under Supabase Auth Providers, add your Google client ID/secret there, and add Supabase's Google callback URL in Google Cloud.
+
+The primary archive page lives at `pages/index.tsx`.
 
 The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
 
