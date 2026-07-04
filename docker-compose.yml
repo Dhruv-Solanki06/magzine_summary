@@ -6,7 +6,7 @@
 
 services:
   web:
-    image: ${IMAGE_NAME:-dhruvsh-1729/magzine-summary}:${TAG:-latest}
+    image: ${IMAGE_NAME:-dhruvsh/magzine-summary}:${TAG:-latest}
     container_name: magzine-summary
     build:
       context: .
