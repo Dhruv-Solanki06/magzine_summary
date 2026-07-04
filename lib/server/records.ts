@@ -55,6 +55,19 @@ export const RECORD_SELECT = `
   conclusions (*)
 `;
 
+// Lightweight select for list / browse / search results. Omits the summaries
+// and conclusions embeds and trims tag/author/magazine columns. This matters:
+// with exact-count pagination PostgREST adds count(*) OVER(), which forces the
+// embeds to be materialised for the WHOLE table on every page — the deep
+// embeds above then time out at large offsets. Cards use the record's own
+// `summary`/`conclusion` columns, so they don't need those embeds.
+export const RECORD_LIST_SELECT = `
+  ${RECORD_COLUMNS},
+  magazines ( id, name, slug, short_name, cover_image_url, logo_image_url ),
+  record_authors ( author_id, authors ( id, name ) ),
+  record_tags ( tag_id, tags ( id, name ) )
+`;
+
 let cachedClient: SupabaseClient | null = null;
 
 export function getSupabaseClient(): SupabaseClient {
@@ -350,7 +363,7 @@ async function keywordSearch(
 
   let candidateQuery: any = supabase
     .from('records')
-    .select(RECORD_SELECT)
+    .select(RECORD_LIST_SELECT)
     .limit(SEARCH_CANDIDATE_CAP);
 
   if (restrictedIds && restrictedIds.length > 0) {
@@ -477,7 +490,7 @@ export async function fetchRecordsWithFilters({
     pageIds.forEach((id, i) => orderMap.set(id, i));
 
     const { data, error } = await applyColumnFilters(
-      supabase.from('records').select(RECORD_SELECT).in('id', pageIds),
+      supabase.from('records').select(RECORD_LIST_SELECT).in('id', pageIds),
       f,
       languageVariants,
     );
@@ -497,7 +510,7 @@ export async function fetchRecordsWithFilters({
     };
   }
 
-  let query: any = supabase.from('records').select(RECORD_SELECT, { count: 'exact' });
+  let query: any = supabase.from('records').select(RECORD_LIST_SELECT, { count: 'exact' });
   if (restrictedIds && restrictedIds.length > 0) query = query.in('id', restrictedIds);
   query = applyColumnFilters(query, f, languageVariants);
   query = applySorting(query, effectiveSort);
