@@ -18,7 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const v = (req.query.v as string) || undefined;
 
     if (!id || !id.endsWith(".pdf")) {
-      return res.status(400).json({ error: "Missing or invalid 'id' (must include .pdf)" });
+      res.status(400).json({ error: "Missing or invalid 'id' (must include .pdf)" });
+      return;
     }
 
     // Build a signed (no transformations) raw URL. (We do NOT add fl_inline here.)
@@ -30,10 +31,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...(v ? { version: v } : {}),
     });
 
-    // Stream from Cloudinary to client
-    const resp = await fetch(cloudUrl);
-    if (!resp.ok || !resp.body) {
-      return res.status(resp.status).end(await resp.text());
+    // Stream from Cloudinary to client. `check=1` lets the UI verify the
+    // source exists before mounting an iframe, avoiding noisy failed embeds.
+    const checkOnly = req.query.check === "1";
+    const resp = await fetch(cloudUrl, checkOnly ? { method: "HEAD" } : undefined);
+    if (checkOnly) {
+      res.status(200).json({ available: resp.ok });
+      return;
+    }
+
+    if (!resp.ok || (!checkOnly && !resp.body)) {
+      res.status(resp.status).end(await resp.text());
+      return;
+    }
+    const body = resp.body;
+    if (!body) {
+      res.status(502).end("PDF response body missing");
+      return;
     }
 
     // Forward headers but force inline PDF
@@ -46,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=600");
 
     // Pipe the body
-    const reader = resp.body.getReader();
+    const reader = body.getReader();
     const encoder = new TextEncoder();
     res.status(200);
     // Use a manual pipe since Next doesn't support res.flush() by default
