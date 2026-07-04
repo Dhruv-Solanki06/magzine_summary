@@ -1,44 +1,24 @@
 import { RecordWithDetails } from '@/types';
 
-export function buildPdfViewUrl(rec: RecordWithDetails): string | null {
-  const ensurePdfExt = (id: string) => (id.endsWith('.pdf') ? id : `${id}.pdf`);
-
-  if (rec.pdf_public_id) {
-    const id = ensurePdfExt(rec.pdf_public_id.trim());
-    return `/api/pdf/view?id=${encodeURIComponent(id)}`;
+/**
+ * PDFs are stored on UploadThing (see kkms/pdf_proj: `pdf_url` is the ufsUrl,
+ * `pdf_public_id` is the UploadThing file key). Those URLs are public, served
+ * as `application/pdf` inline with `access-control-allow-origin: *` and no
+ * X-Frame-Options, so they embed directly in an <iframe> — no proxy needed.
+ */
+export function buildPdfViewUrl(
+  rec: Pick<RecordWithDetails, 'pdf_url' | 'pdf_public_id'>,
+): string | null {
+  const url = rec.pdf_url?.trim();
+  if (url && /^https?:\/\//i.test(url)) {
+    return url;
   }
 
-  if (!rec.pdf_url) {
-    return null;
+  // Fallback: reconstruct the UploadThing file URL from the stored key.
+  const key = rec.pdf_public_id?.trim();
+  if (key) {
+    return `https://utfs.io/f/${encodeURIComponent(key)}`;
   }
 
-  try {
-    const url = new URL(rec.pdf_url);
-    const parts = url.pathname.split('/').filter(Boolean);
-    const uploadIndex = parts.findIndex((segment) => segment === 'upload');
-    if (uploadIndex === -1) {
-      return rec.pdf_url;
-    }
-
-    const afterUpload = parts.slice(uploadIndex + 1);
-    let version: string | undefined;
-
-    if (afterUpload[0] && /^v\d+$/i.test(afterUpload[0])) {
-      version = afterUpload.shift()!.replace(/^v/i, '');
-    }
-
-    const publicIdWithExt = afterUpload.join('/');
-    if (!publicIdWithExt.endsWith('.pdf')) {
-      return rec.pdf_url;
-    }
-
-    const params = new URLSearchParams({ id: publicIdWithExt });
-    if (version) {
-      params.set('v', version);
-    }
-
-    return `/api/pdf/view?${params.toString()}`;
-  } catch {
-    return rec.pdf_url;
-  }
+  return null;
 }
