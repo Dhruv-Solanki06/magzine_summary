@@ -12,7 +12,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-IMAGE_NAME="${IMAGE_NAME:-dhruvsh-1729/magzine-summary}"
+IMAGE_NAME="${IMAGE_NAME:-dhruvsh/magzine-summary}"
 TAG="${TAG:-latest}"
 GIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo manual)"
 
