@@ -25,8 +25,8 @@ const IssueNavigator: React.FC<IssueNavigatorProps> = ({
   const recordsInIssue = sameIssue.length > 0 ? sameIssue : [record];
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="rounded-[14px] bg-white p-4 shadow-[var(--shadow-card)] ring-1 ring-black/[0.04] sm:p-5">
+    <section className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 rounded-[14px] bg-white p-4 shadow-[var(--shadow-card)] ring-1 ring-black/[0.04] sm:p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-black/40">
@@ -77,7 +77,7 @@ const IssueNavigator: React.FC<IssueNavigatorProps> = ({
         </div>
       </div>
 
-      <aside className="rounded-[14px] bg-white p-4 shadow-[var(--shadow-card)] ring-1 ring-black/[0.04] sm:p-5">
+      <aside className="min-w-0 rounded-[14px] bg-white p-4 shadow-[var(--shadow-card)] ring-1 ring-black/[0.04] sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-black/40">

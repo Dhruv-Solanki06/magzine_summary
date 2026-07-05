@@ -55,7 +55,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
         className="absolute inset-0 z-10 rounded-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black/60"
       />
 
-      <div className="relative h-44 w-full shrink-0 overflow-hidden rounded-lg sm:h-auto sm:w-[108px]">
+      <div className="relative h-32 w-full shrink-0 overflow-hidden rounded-lg sm:h-auto sm:w-[108px]">
         <PexelsCover
           query={coverQuery}
           alt={title}
@@ -72,7 +72,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
       {/* Content */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/45">
+          <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-black/45">
             {mag}
           </span>
           {onToggleBookmark && (
@@ -106,13 +106,14 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
           <p className="mt-1 text-[13px] text-black/55 line-clamp-1">By {authors}</p>
         )}
 
+        {/* Summary — hidden on mobile to keep list cards minimal and scannable */}
         {summary && (
-          <p className="mt-2 text-[13.5px] leading-[1.5] text-black/54 line-clamp-2">
+          <p className="mt-2 hidden text-[13.5px] leading-[1.5] text-black/54 line-clamp-2 sm:block">
             {truncate(summary, 200)}
           </p>
         )}
 
-        {/* Meta row */}
+        {/* Meta row — only the date on mobile; issue/pages return at sm+ */}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-black/50">
           {date && (
             <span className="inline-flex items-center gap-1.5">
@@ -121,22 +122,22 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
             </span>
           )}
           {issue && (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 sm:inline-flex">
               <Layers className="h-3.5 w-3.5 text-black/30" />
               {issue}
             </span>
           )}
           {record.page_numbers && (
-            <span className="inline-flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 sm:inline-flex">
               <FileText className="h-3.5 w-3.5 text-black/30" />
               pp. {record.page_numbers}
             </span>
           )}
         </div>
 
-        {/* Tags */}
+        {/* Tags — hidden on mobile, shown from sm+ */}
         {tags.length > 0 && (
-          <div className="relative z-20 mt-auto flex flex-wrap gap-1.5 pt-3">
+          <div className="relative z-20 mt-auto hidden flex-wrap gap-1.5 pt-3 sm:flex">
             {tags.slice(0, 3).map((rel) => (
               <TagPill
                 key={rel.tags.id}

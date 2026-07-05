@@ -63,11 +63,28 @@ export function authorLabel(record: RecordWithDetails): string {
   return (record.authors || '').trim();
 }
 
+/**
+ * Some archived summaries store their line breaks as *literal* escape sequences
+ * ("\r\n", "\n", "\t") rather than real control characters, so they render as
+ * visible "\r\n" / "\t" text. Turn those back into real whitespace so
+ * `whitespace-pre-line` can lay the text out into readable paragraphs, and
+ * collapse runaway blank lines.
+ */
+export function normalizeBodyText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .replace(/\\r\\n|\\n|\\r/g, '\n')
+    .replace(/\\t/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function bestSummary(record: RecordWithDetails): string {
   if (record.summaries && record.summaries.length > 0 && record.summaries[0].summary) {
-    return record.summaries[0].summary;
+    return normalizeBodyText(record.summaries[0].summary);
   }
-  return record.summary || '';
+  return normalizeBodyText(record.summary);
 }
 
 export function bestConclusion(record: RecordWithDetails): string {
@@ -76,9 +93,9 @@ export function bestConclusion(record: RecordWithDetails): string {
     record.conclusions.length > 0 &&
     record.conclusions[0].conclusion
   ) {
-    return record.conclusions[0].conclusion;
+    return normalizeBodyText(record.conclusions[0].conclusion);
   }
-  return record.conclusion || '';
+  return normalizeBodyText(record.conclusion);
 }
 
 export function issueLabel(record: {

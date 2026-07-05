@@ -1,7 +1,7 @@
 // lib/pexels.ts — client-side Pexels image lookup with in-memory + session cache.
 // Used to give each article a dynamically-fetched cover image.
 
-const PEXELS_API_KEY = process.env.NEXT_PUBLIC_PEXELS_API_KEY;
+import { publicEnv } from '@/lib/public-env';
 
 type CacheValue = string | null;
 const memoryCache = new Map<string, CacheValue>();
@@ -45,7 +45,8 @@ export async function fetchPexelsImage(query: string): Promise<CacheValue> {
   }
   if (inFlight.has(key)) return inFlight.get(key)!;
 
-  if (!PEXELS_API_KEY) {
+  const apiKey = publicEnv('NEXT_PUBLIC_PEXELS_API_KEY');
+  if (!apiKey) {
     memoryCache.set(key, null);
     return null;
   }
@@ -56,7 +57,7 @@ export async function fetchPexelsImage(query: string): Promise<CacheValue> {
         `https://api.pexels.com/v1/search?query=${encodeURIComponent(
           query,
         )}&per_page=1&orientation=landscape`,
-        { headers: { Authorization: PEXELS_API_KEY } },
+        { headers: { Authorization: apiKey } },
       );
       if (!res.ok) return null;
       const data = await res.json();

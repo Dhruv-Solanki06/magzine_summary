@@ -1,14 +1,19 @@
 import { createBrowserClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { publicEnv } from '@/lib/public-env';
 
 let browserClient: SupabaseClient | null = null;
 
-const publishableKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Resolved lazily (not at module load) so runtime-injected window.__ENV is used.
+function resolvePublishableKey(): string | undefined {
+  return (
+    publicEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ??
+    publicEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  );
+}
 
 export function isSupabaseAuthConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && publishableKey);
+  return Boolean(publicEnv('NEXT_PUBLIC_SUPABASE_URL') && resolvePublishableKey());
 }
 
 export function getSupabaseAuthConfigError(): string | null {
@@ -22,7 +27,8 @@ export function getSupabaseAuthConfigError(): string | null {
 }
 
 export function getSupabaseBrowserClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = publicEnv('NEXT_PUBLIC_SUPABASE_URL');
+  const publishableKey = resolvePublishableKey();
 
   if (!url || !publishableKey) {
     throw new Error(getSupabaseAuthConfigError() ?? 'Supabase Auth is not configured.');

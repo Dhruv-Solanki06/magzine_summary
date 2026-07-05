@@ -1,11 +1,12 @@
 import { RecordWithDetails, SmartSearchResponse, SmartSearchResult } from '@/types';
+import { publicEnv } from '@/lib/public-env';
 
 type Primitive = string | number | boolean;
 type FilterValue = Primitive | Primitive[] | undefined;
 
 type FetchFilters = Record<string, FilterValue>;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_BASE = publicEnv('NEXT_PUBLIC_API_URL') || '/api';
 
 function buildSearchParams(page: number, limit: number, filters: FetchFilters): URLSearchParams {
   const params = new URLSearchParams({
