@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { X } from 'lucide-react';
 
 import Header from '@/components/common/Header';
+import { useAuthGate } from '@/components/auth/AuthGate';
 import SearchBar from '@/components/browse/SearchBar';
 import FilterBar, { type FilterBarValue } from '@/components/browse/FilterBar';
 import ArticleGrid from '@/components/browse/ArticleGrid';
@@ -54,9 +55,13 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
   searchQuery,
 }) => {
   const router = useRouter();
+  const { requireAuth } = useAuthGate();
 
   const updateQuery = useCallback(
     (patch: QueryPatch, resetPage = true) => {
+      // Searching, filtering, sorting and paging all re-hit the DB — gate them
+      // behind auth so anonymous traffic can't drive up egress.
+      if (!requireAuth('search and filter articles')) return;
       const next: Record<string, string> = {};
       Object.entries(router.query).forEach(([k, v]) => {
         if (Array.isArray(v)) {
@@ -72,7 +77,7 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
       });
       void router.push({ pathname: '/', query: next }, undefined, { scroll: true });
     },
-    [router],
+    [router, requireAuth],
   );
 
   const handleFilterChange = useCallback(
@@ -92,8 +97,9 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
   );
 
   const handleReset = useCallback(() => {
+    if (!requireAuth('search and filter articles')) return;
     void router.push({ pathname: '/' }, undefined, { scroll: true });
-  }, [router]);
+  }, [router, requireAuth]);
 
   const handleTagClick = useCallback(
     (tagId: number) => {

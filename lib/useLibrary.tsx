@@ -16,8 +16,8 @@ import React, {
 } from 'react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuthGate } from '@/components/auth/AuthGate';
 import { getSupabaseBrowserClient } from '@/lib/supabase/auth-client';
-import AuthRequiredModal from '@/components/auth/AuthRequiredModal';
 
 export interface StoredBookmark {
   id: number;
@@ -46,15 +46,12 @@ const LibraryContext = createContext<LibraryContextValue | undefined>(undefined)
 
 export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { requireAuth } = useAuthGate();
   const userId = user?.id ?? null;
 
   const [bookmarks, setBookmarks] = useState<StoredBookmark[]>([]);
   const [favorites, setFavorites] = useState<StoredFavoriteAuthor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [authModal, setAuthModal] = useState<{ open: boolean; action: string }>({
-    open: false,
-    action: '',
-  });
 
   // Load (or clear) the signed-in user's library whenever the account changes.
   useEffect(() => {
@@ -110,10 +107,6 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     };
   }, [userId]);
 
-  const promptAuth = useCallback((action: string) => {
-    setAuthModal({ open: true, action });
-  }, []);
-
   const isBookmarked = useCallback(
     (id: number) => bookmarks.some((b) => b.id === id),
     [bookmarks],
@@ -126,7 +119,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const toggleBookmark = useCallback(
     (entry: StoredBookmark): boolean => {
       if (!userId) {
-        promptAuth('bookmark articles');
+        requireAuth('bookmark articles');
         return false;
       }
       const exists = bookmarks.some((b) => b.id === entry.id);
@@ -159,13 +152,13 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         });
       return true;
     },
-    [bookmarks, promptAuth, userId],
+    [bookmarks, requireAuth, userId],
   );
 
   const toggleFavorite = useCallback(
     (entry: StoredFavoriteAuthor): boolean => {
       if (!userId) {
-        promptAuth('follow authors');
+        requireAuth('follow authors');
         return false;
       }
       const exists = favorites.some((a) => a.id === entry.id);
@@ -193,7 +186,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         });
       return true;
     },
-    [favorites, promptAuth, userId],
+    [favorites, requireAuth, userId],
   );
 
   const removeBookmark = useCallback(
@@ -257,16 +250,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
     ],
   );
 
-  return (
-    <LibraryContext.Provider value={value}>
-      {children}
-      <AuthRequiredModal
-        open={authModal.open}
-        action={authModal.action}
-        onClose={() => setAuthModal((m) => ({ ...m, open: false }))}
-      />
-    </LibraryContext.Provider>
-  );
+  return <LibraryContext.Provider value={value}>{children}</LibraryContext.Provider>;
 }
 
 function useLibrary(): LibraryContextValue {

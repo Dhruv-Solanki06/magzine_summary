@@ -6,6 +6,8 @@ import type { GetServerSideProps, NextPage } from 'next';
 import { Search, SlidersHorizontal, ChevronDown, Loader2 } from 'lucide-react';
 
 import Header from '@/components/common/Header';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useAuthGate } from '@/components/auth/AuthGate';
 import { ResearcherCard, ResearcherCardSkeleton } from '@/components/researchers/ResearcherCard';
 import SortDropdown from '@/components/researchers/SortDropdown';
 import {
@@ -33,6 +35,8 @@ function useDebounced<T>(value: T, delay: number): T {
 }
 
 const ResearchersPage: NextPage<Props> = ({ initial }) => {
+  const { user } = useAuth();
+  const { requireAuth } = useAuthGate();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState(defaultSort);
   const [showSort, setShowSort] = useState(false);
@@ -95,7 +99,9 @@ const ResearchersPage: NextPage<Props> = ({ initial }) => {
   }, [debouncedSearch, fetchPage, hasMore, isLoading, isLoadingMore, page, sort.value]);
 
   useEffect(() => {
-    if (!loadMoreRef.current || !hasMore) return;
+    // Infinite scroll is a signed-in convenience; anonymous users get the
+    // gated "Load more" button instead (so scrolling never triggers the modal).
+    if (!loadMoreRef.current || !hasMore || !user) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) loadMore();
@@ -104,7 +110,7 @@ const ResearchersPage: NextPage<Props> = ({ initial }) => {
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadMore]);
+  }, [hasMore, loadMore, user]);
 
   const countLabel = useMemo(
     () => `${totalFound.toLocaleString()} researcher${totalFound === 1 ? '' : 's'}`,
@@ -140,6 +146,9 @@ const ResearchersPage: NextPage<Props> = ({ initial }) => {
               <Search className="h-5 w-5 text-neutral-900" />
               <input
                 className="flex-1 bg-transparent text-base leading-5 text-neutral-900 outline-none placeholder:text-[rgba(23,23,23,0.5)]"
+                onFocus={(e) => {
+                  if (!requireAuth('search researchers')) e.currentTarget.blur();
+                }}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search researchers, interests, or locations"
                 type="text"
@@ -154,7 +163,10 @@ const ResearchersPage: NextPage<Props> = ({ initial }) => {
             <div className="relative flex items-center gap-3">
               <button
                 className="flex items-center justify-center gap-1 overflow-hidden rounded-full px-[14px] py-[12px] text-[14px] font-medium leading-[20px] text-black/70 transition-colors hover:bg-black/5"
-                onClick={() => setShowSort((v) => !v)}
+                onClick={() => {
+                  if (!requireAuth('sort researchers')) return;
+                  setShowSort((v) => !v);
+                }}
                 type="button"
               >
                 <SlidersHorizontal className="h-4 w-4 text-black/70" />
@@ -224,7 +236,9 @@ const ResearchersPage: NextPage<Props> = ({ initial }) => {
                 <div ref={loadMoreRef} className="h-1 w-full" />
                 <button
                   className="rounded-full border border-black/10 bg-zinc-100 px-5 py-2 text-[14px] font-medium text-[#171717] transition-colors hover:bg-zinc-200"
-                  onClick={loadMore}
+                  onClick={() => {
+                    if (requireAuth('browse more researchers')) loadMore();
+                  }}
                   type="button"
                 >
                   Load more

@@ -71,8 +71,8 @@ const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({ open, action, onC
           Log in to {action || 'continue'}
         </h2>
         <p className="mt-1.5 text-[14.5px] leading-6 text-black/55">
-          Create a free account or log in to save bookmarks and follow authors — they&apos;ll
-          be synced to your account across devices.
+          Searching, filtering, bookmarks and following are for members. Create a free
+          account or log in — it only takes a moment.
         </p>
 
         <div className="mt-5 grid gap-2">
