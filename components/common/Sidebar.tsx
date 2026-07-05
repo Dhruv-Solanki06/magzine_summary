@@ -15,8 +15,10 @@ import {
   LibraryBig,
   LayoutGrid,
   LineChart,
+  Users,
   Bookmark,
   Star,
+  UserCircle,
   User,
   LogIn,
   LogOut,
@@ -36,10 +38,12 @@ const PRIMARY: NavItem[] = [
   { href: '/', label: 'Articles', icon: BookOpen },
   { href: '/magazines', label: 'Magazines', icon: LibraryBig },
   { href: '/subjects', label: 'Subjects', icon: LayoutGrid },
+  { href: '/researchers', label: 'Researchers', icon: Users },
   { href: '/tracker', label: 'Research tracker', icon: LineChart },
 ];
 
 const LIBRARY: NavItem[] = [
+  { href: '/profile', label: 'My profile', icon: UserCircle },
   { href: '/bookmarks', label: 'Bookmarks', icon: Bookmark },
   { href: '/favorites', label: 'Favorite authors', icon: Star },
 ];
