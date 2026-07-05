@@ -2,9 +2,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Bookmark, BookOpen, LayoutGrid, LibraryBig, LogIn, LogOut, Star, User } from 'lucide-react';
+import { Bookmark, LineChart, LogIn, LogOut, Menu, Star, User } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useSidebar } from '@/components/common/AppShell';
 import { SITE_DOMAIN, SITE_NAME, SITE_TAGLINE } from '@/lib/brand';
 
 interface HeaderProps {
@@ -16,18 +17,10 @@ interface HeaderProps {
   title?: string;
 }
 
-const NAV = [
-  { href: '/', label: 'Articles', icon: BookOpen },
-  { href: '/magazines', label: 'Magazines', icon: LibraryBig },
-  { href: '/subjects', label: 'Subjects', icon: LayoutGrid },
-];
-
 export const Header: React.FC<HeaderProps> = () => {
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
-
-  const isActive = (href: string) =>
-    href === '/' ? router.pathname === '/' : router.pathname.startsWith(href);
+  const { openSidebar } = useSidebar();
 
   const handleSignOut = async () => {
     const result = await signOut();
@@ -39,9 +32,20 @@ export const Header: React.FC<HeaderProps> = () => {
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full items-center gap-4 px-4 sm:px-6 lg:px-10">
-        {/* Brand */}
-        <Link href="/" className="flex items-center gap-2.5">
+      <div className="flex h-16 w-full items-center gap-3 px-4 sm:px-6 lg:px-10">
+        {/* Hamburger — opens the sidebar drawer below lg */}
+        <button
+          type="button"
+          onClick={openSidebar}
+          aria-label="Open menu"
+          className={`${iconBtn} -ml-1 lg:hidden`}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Brand — the sidebar carries the brand on desktop, so only show it
+            here on mobile where the sidebar is hidden. */}
+        <Link href="/" className="flex items-center gap-2.5 lg:hidden">
           <span className="flex h-8 w-8 items-center justify-center rounded-[9px] bg-[#171717] text-[12px] font-bold tracking-[-0.4px] text-white">
             AC
           </span>
@@ -58,31 +62,13 @@ export const Header: React.FC<HeaderProps> = () => {
           </span>
         </Link>
 
-        {/* Primary nav */}
-        <nav className="ml-2 hidden items-center gap-1 md:flex">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = isActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[15px] transition-colors ${
-                  active
-                    ? 'bg-black/[0.05] font-medium text-black/92'
-                    : 'text-black/55 hover:text-black/80'
-                }`}
-              >
-                <Icon className="h-[18px] w-[18px]" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
-
         <div className="flex-1" />
 
-        {/* Actions */}
+        {/* Quick actions */}
         <div className="flex items-center gap-1">
+          <Link href="/tracker" className={iconBtn} title="Research tracker" aria-label="Research tracker">
+            <LineChart className="h-[18px] w-[18px]" />
+          </Link>
           <Link href="/bookmarks" className={iconBtn} title="Bookmarks" aria-label="Bookmarks">
             <Bookmark className="h-[18px] w-[18px]" />
           </Link>
@@ -119,25 +105,6 @@ export const Header: React.FC<HeaderProps> = () => {
           )}
         </div>
       </div>
-
-      {/* Mobile nav row */}
-      <nav className="flex items-center gap-1 border-t border-black/[0.06] px-4 py-1.5 md:hidden">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = isActive(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                active ? 'bg-black/[0.05] font-medium text-black/92' : 'text-black/55'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
     </header>
   );
 };

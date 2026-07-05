@@ -117,3 +117,32 @@ export function truncate(text: string, max: number): string {
 export function formatCount(n: number): string {
   return new Intl.NumberFormat('en-US').format(n);
 }
+
+/** Compact human duration for reading time: "12s", "4m", "1h 12m", "3h". */
+export function formatDuration(totalSeconds: number): string {
+  const secs = Math.max(0, Math.round(totalSeconds));
+  if (secs < 60) return `${secs}s`;
+  const minutes = Math.floor(secs / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  return remMinutes ? `${hours}h ${remMinutes}m` : `${hours}h`;
+}
+
+/** Short relative time for tracker rows: "just now", "3h ago", "2d ago". */
+export function formatRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return '';
+  const diffMs = Date.now() - then;
+  if (diffMs < 60_000) return 'just now';
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  return new Date(iso).toLocaleDateString();
+}

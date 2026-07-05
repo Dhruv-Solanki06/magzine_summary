@@ -15,7 +15,9 @@ interface ArticleGridProps {
   onReset?: () => void;
 }
 
-const GRID_CLASS = 'grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3';
+// Two cards per row on desktop; only step up to three once the viewport is at
+// least 1500px wide (a custom breakpoint above Tailwind's default `xl`).
+const GRID_CLASS = 'grid grid-cols-1 gap-4 lg:grid-cols-2 min-[1500px]:grid-cols-3';
 
 const SkeletonCard: React.FC = () => (
   <div className="flex h-full animate-pulse flex-col gap-4 rounded-[14px] bg-white p-4 ring-1 ring-black/[0.04] sm:flex-row sm:p-5">

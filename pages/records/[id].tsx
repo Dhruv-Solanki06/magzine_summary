@@ -17,6 +17,7 @@ import type { RecordWithDetails } from '@/types';
 import type { VolumeIssueNavItem } from '@/lib/server/records';
 import { magazineName } from '@/lib/format';
 import { useBookmarks, useFavoriteAuthors } from '@/lib/useLibrary';
+import { useArticleReadingTimer } from '@/lib/useReadingTracker';
 import { SITE_NAME } from '@/lib/brand';
 
 interface RecordDetailProps {
@@ -35,6 +36,13 @@ const RecordDetailPage: NextPage<RecordDetailProps> = ({
   const router = useRouter();
   const { isBookmarked, toggle: toggleBookmark } = useBookmarks();
   const { isFavorite, toggle: toggleFavorite } = useFavoriteAuthors();
+
+  // Track reading time / opens / completion for signed-in users.
+  useArticleReadingTimer(
+    record.id,
+    record.title_name || 'Untitled article',
+    magazineName(record),
+  );
 
   const authorEntries = useMemo(
     () =>
