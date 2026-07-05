@@ -12,6 +12,7 @@ import RecordContentCard from '@/components/records/RecordContentCard';
 import IssueNavigator from '@/components/records/IssueNavigator';
 import PdfViewerCard from '@/components/records/PdfViewerCard';
 import RecordInsightPanel from '@/components/records/RecordInsightPanel';
+import ReportContentButton from '@/components/records/ReportContentButton';
 import ArticleGrid from '@/components/browse/ArticleGrid';
 import type { RecordWithDetails } from '@/types';
 import type { VolumeIssueNavItem } from '@/lib/server/records';
@@ -86,13 +87,19 @@ const RecordDetailPage: NextPage<RecordDetailProps> = ({
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
-            <Link
-              href="/"
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-black/[0.04] px-3 text-sm font-medium text-black/58 transition hover:bg-black/[0.07] hover:text-black/86"
-            >
-              <BookOpen className="h-4 w-4" />
-              Browse articles
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <ReportContentButton
+                recordId={record.id}
+                recordTitle={record.title_name || 'Untitled article'}
+              />
+              <Link
+                href="/"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-black/[0.04] px-3 text-sm font-medium text-black/58 transition hover:bg-black/[0.07] hover:text-black/86"
+              >
+                <BookOpen className="h-4 w-4" />
+                Browse articles
+              </Link>
+            </div>
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
