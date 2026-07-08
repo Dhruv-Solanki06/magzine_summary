@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { RecordWithDetails } from '@/types';
+import { AI_CHAT_ENABLED } from '@/lib/features';
 import {
   authorLabel,
   bestConclusion,
@@ -135,6 +136,13 @@ async function callDeepSeek(messages: DeepSeekMessage[]): Promise<string> {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // AI chat is disabled for now (see lib/features.ts). Reject before touching
+  // the paid model so a direct request to this route costs nothing.
+  if (!AI_CHAT_ENABLED) {
+    res.status(503).json({ error: 'AI chat is currently disabled.' });
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     res.status(405).json({ error: 'Method Not Allowed' });

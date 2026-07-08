@@ -20,6 +20,7 @@ import { magazineName } from '@/lib/format';
 import { useBookmarks, useFavoriteAuthors } from '@/lib/useLibrary';
 import { useArticleReadingTimer } from '@/lib/useReadingTracker';
 import { SITE_NAME } from '@/lib/brand';
+import { AI_CHAT_ENABLED } from '@/lib/features';
 
 interface RecordDetailProps {
   record: RecordWithDetails;
@@ -119,7 +120,7 @@ const RecordDetailPage: NextPage<RecordDetailProps> = ({
                 onFavoriteAuthorsToggle={handleFavoriteAuthors}
               />
 
-              <RecordInsightPanel record={record} />
+              {AI_CHAT_ENABLED && <RecordInsightPanel record={record} />}
 
               <IssueNavigator
                 record={record}
