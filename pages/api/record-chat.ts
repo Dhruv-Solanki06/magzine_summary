@@ -91,7 +91,7 @@ async function callDeepSeek(messages: DeepSeekMessage[]): Promise<string> {
   }
 
   const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEEPSEEK_TIMEOUT_MS);
 
