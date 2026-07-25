@@ -124,7 +124,12 @@ function fallbackList(): SubjectWithCount[] {
   }));
 }
 
-export const getServerSideProps: GetServerSideProps<SubjectsPageProps> = async () => {
+export const getServerSideProps: GetServerSideProps<SubjectsPageProps> = async ({ res }) => {
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=21600, stale-while-revalidate=86400',
+  );
+
   const { fetchSubjectsWithCounts } = await import('@/lib/server/subjects');
   const { ready, subjects } = await fetchSubjectsWithCounts();
   return { props: { ready, subjects } };

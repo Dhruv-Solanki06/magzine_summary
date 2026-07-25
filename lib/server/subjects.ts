@@ -10,6 +10,13 @@ import {
   finalizeRecords,
   getSupabaseClient,
 } from './records';
+import { withCache } from './cache';
+
+// Subject taxonomy and its counts change only on re-import, but the pages that
+// read them fan out into one count query per subject / sub-subject on every
+// request. Cache aggressively.
+const SUBJECT_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+const SUBJECT_RECORDS_CACHE_TTL = 1000 * 60 * 15; // 15 minutes
 
 export interface SubjectRow {
   id: number;
@@ -50,6 +57,17 @@ export async function fetchSubjectsWithCounts(): Promise<{
   ready: boolean;
   subjects: SubjectWithCount[];
 }> {
+  return withCache(
+    JSON.stringify({ subjects: 'with-counts-v1' }),
+    SUBJECT_CACHE_TTL,
+    loadSubjectsWithCounts,
+  );
+}
+
+async function loadSubjectsWithCounts(): Promise<{
+  ready: boolean;
+  subjects: SubjectWithCount[];
+}> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('subject_areas')
@@ -76,6 +94,12 @@ export async function fetchSubjectsWithCounts(): Promise<{
 }
 
 export async function fetchSubjectBySlug(slug: string): Promise<SubjectRow | null> {
+  return withCache(JSON.stringify({ subject: 'by-slug-v1', slug }), SUBJECT_CACHE_TTL, () =>
+    loadSubjectBySlug(slug),
+  );
+}
+
+async function loadSubjectBySlug(slug: string): Promise<SubjectRow | null> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('subject_areas')
@@ -97,6 +121,16 @@ function taxonomyFallbackSubject(slug: string): SubjectRow | null {
 }
 
 export async function fetchSubsubjectsWithCounts(
+  subjectId: number,
+): Promise<SubsubjectWithCount[]> {
+  return withCache(
+    JSON.stringify({ subsubjects: 'with-counts-v1', subjectId }),
+    SUBJECT_CACHE_TTL,
+    () => loadSubsubjectsWithCounts(subjectId),
+  );
+}
+
+async function loadSubsubjectsWithCounts(
   subjectId: number,
 ): Promise<SubsubjectWithCount[]> {
   const supabase = getSupabaseClient();
@@ -132,6 +166,29 @@ interface SubjectRecordsRequest {
 
 /** Records that belong to a subject (or a specific sub-subject), paginated. */
 export async function fetchRecordsBySubject({
+  subjectId,
+  subsubjectId,
+  page = 1,
+  pageSize = 20,
+  sort = 'title_asc',
+  search,
+}: SubjectRecordsRequest): Promise<PaginatedResponse<RecordWithDetails>> {
+  const cacheKey = JSON.stringify({
+    subjectRecords: 'v1',
+    subjectId,
+    subsubjectId: subsubjectId ?? null,
+    page,
+    pageSize,
+    sort,
+    search: search ?? null,
+  });
+
+  return withCache(cacheKey, SUBJECT_RECORDS_CACHE_TTL, () =>
+    loadRecordsBySubject({ subjectId, subsubjectId, page, pageSize, sort, search }),
+  );
+}
+
+async function loadRecordsBySubject({
   subjectId,
   subsubjectId,
   page = 1,

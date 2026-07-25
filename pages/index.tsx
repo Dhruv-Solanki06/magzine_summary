@@ -293,7 +293,15 @@ function str(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ query }) => {
+export const getServerSideProps: GetServerSideProps<BrowsePageProps> = async ({ query, res }) => {
+  // Anonymous output — the auth gate around search / filter / sort is applied
+  // client-side, so nothing user-specific is rendered here and this is safe to
+  // share. Keeps repeat + crawler hits off Supabase.
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=900, stale-while-revalidate=3600',
+  );
+
   const {
     fetchRecordsWithFilters,
     fetchAllMagazinesWithStats,

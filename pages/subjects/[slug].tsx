@@ -224,7 +224,13 @@ function str(v: string | string[] | undefined): string | undefined {
 export const getServerSideProps: GetServerSideProps<SubjectDetailProps> = async ({
   params,
   query,
+  res,
 }) => {
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=900, stale-while-revalidate=3600',
+  );
+
   const { fetchSubjectBySlug, fetchSubsubjectsWithCounts, fetchRecordsBySubject } = await import(
     '@/lib/server/subjects'
   );

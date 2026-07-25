@@ -1,0 +1,47 @@
+# Article and magazine pages stay fully crawlable — they are the content worth
+# indexing. What is blocked below is the filter/search surface: those URLs are a
+# combinatorial space (search x language x year x tags x authors x sort x page)
+# that resolves to the same articles, so crawling them adds no index value and
+# generates unbounded database reads.
+
+User-agent: *
+Disallow: /api/
+Disallow: /*?search=
+Disallow: /*?*search=
+Disallow: /*?*tags=
+Disallow: /*?*authors=
+Disallow: /*?*sort=
+Disallow: /*?*language=
+Disallow: /*?*yearStart=
+Disallow: /*?*yearEnd=
+Disallow: /*?*page=
+Disallow: /account
+Disallow: /bookmarks
+Disallow: /favorites
+Disallow: /tracker
+Disallow: /profile/edit
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /auth/
+
+# Aggressive crawlers: same rules, but slow them down as well. Google ignores
+# Crawl-delay (tune it in Search Console instead); Bing and Yandex honour it.
+User-agent: bingbot
+Crawl-delay: 10
+
+User-agent: Yandex
+Crawl-delay: 10
+
+User-agent: AhrefsBot
+Crawl-delay: 30
+
+User-agent: SemrushBot
+Crawl-delay: 30
+
+User-agent: MJ12bot
+Crawl-delay: 30
+
+User-agent: DotBot
+Crawl-delay: 30

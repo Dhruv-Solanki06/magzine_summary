@@ -159,13 +159,24 @@ const RecordDetailPage: NextPage<RecordDetailProps> = ({
   );
 };
 
-export const getServerSideProps: GetServerSideProps<RecordDetailProps> = async ({ params }) => {
+export const getServerSideProps: GetServerSideProps<RecordDetailProps> = async ({
+  params,
+  res,
+}) => {
   const {
     fetchRecordWithDetailsById,
     fetchRecordsFromSameIssue,
-    fetchRecordsWithFilters,
+    fetchRelatedRecords,
     fetchVolumeIssueSequence,
   } = await import('@/lib/server/records');
+
+  // Archive content is immutable in practice. Letting the browser / any CDN in
+  // front of the app reuse this response keeps crawler sweeps over all 8.5k
+  // article pages from turning into 8.5k rounds of Supabase queries.
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=21600, stale-while-revalidate=86400',
+  );
 
   const id = Number(Array.isArray(params?.id) ? params?.id[0] : params?.id);
   if (!Number.isFinite(id)) return { notFound: true };
@@ -173,22 +184,16 @@ export const getServerSideProps: GetServerSideProps<RecordDetailProps> = async (
   const record = await fetchRecordWithDetailsById(id);
   if (!record) return { notFound: true };
 
-  const [sameIssueAll, volumeIssues, relatedResponse] = await Promise.all([
+  const [sameIssueAll, volumeIssues, relatedAll] = await Promise.all([
     fetchRecordsFromSameIssue(record),
     fetchVolumeIssueSequence(record),
-    (() => {
-      const firstTag = record.record_tags?.[0]?.tags?.id;
-      const filters = firstTag
-        ? { tags: [firstTag] }
-        : { magazineId: record.magazine_id ?? undefined };
-      return fetchRecordsWithFilters({ page: 1, pageSize: 9, filters, sort: 'random' });
-    })(),
+    fetchRelatedRecords(record),
   ]);
 
   const sameIssue = sameIssueAll.some((r) => r.id === id)
     ? sameIssueAll
     : [record, ...sameIssueAll];
-  const related = relatedResponse.data.filter((r) => r.id !== id).slice(0, 6);
+  const related = relatedAll.filter((r) => r.id !== id).slice(0, 6);
 
   return { props: { record, sameIssue, volumeIssues, related } };
 };

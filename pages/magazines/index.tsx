@@ -52,7 +52,12 @@ const MagazinesPage: NextPage<MagazinesPageProps> = ({ magazines, totalArticles 
   );
 };
 
-export const getServerSideProps: GetServerSideProps<MagazinesPageProps> = async () => {
+export const getServerSideProps: GetServerSideProps<MagazinesPageProps> = async ({ res }) => {
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=21600, stale-while-revalidate=86400',
+  );
+
   const { fetchAllMagazinesWithStats } = await import('@/lib/server/records');
   const magazines = await fetchAllMagazinesWithStats();
   const totalArticles = magazines.reduce((sum, m) => sum + m.recordCount, 0);

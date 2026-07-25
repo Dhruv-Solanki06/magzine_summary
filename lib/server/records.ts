@@ -10,7 +10,7 @@ import type {
   Tag,
 } from '@/types';
 import { extractYear, formatLanguage } from '@/lib/format';
-import { readCache, writeCache } from './cache';
+import { withCache } from './cache';
 
 interface RecordsRequest {
   page?: number;
@@ -30,8 +30,14 @@ export interface VolumeIssueNavItem {
   pageStart: string | null;
 }
 
-const RECORDS_CACHE_TTL = 1000 * 60 * 5; // 5 minutes
-const LOOKUP_CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+const RECORDS_CACHE_TTL = 1000 * 60 * 15; // 15 minutes
+// Lookups (languages, magazine stats) are effectively static — the archive is
+// not written to at runtime — so a short TTL only bought repeated full-table
+// scans. See fetchLanguageFacets, which pages through every row.
+const LOOKUP_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+// Single articles and issue navigation: immutable in practice, and hit on every
+// article page view (including by crawlers walking all 8.5k records).
+const RECORD_DETAIL_CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
 
 // Upper bound on the candidate pool we rank in-memory for keyword search.
 const SEARCH_CANDIDATE_CAP = 400;
@@ -67,6 +73,21 @@ export const RECORD_LIST_SELECT = `
   record_authors ( author_id, authors ( id, name ) ),
   record_tags ( tag_id, tags ( id, name ) )
 `;
+
+// Sibling-article list in IssueNavigator. It renders only the page number, the
+// title and the author names, so the full record select (with its summaries /
+// conclusions embeds) was shipping ~340KB per article view to render ~16KB of
+// UI. Keep this in sync with what IssueNavigator actually reads.
+const RECORD_ISSUE_SELECT = `
+  id, magazine_id, timestamp, volume, number, title_name, page_numbers, authors,
+  record_authors ( author_id, authors ( id, name ) )
+`;
+
+// Candidate pool for ranked keyword search. Deliberately excludes summary and
+// conclusion: at a 400-row cap those two columns alone were ~1MB per search,
+// and only the 20 rows of the requested page are ever rendered. Matching still
+// covers them via the ilike filter in PostgREST; see keywordSearch.
+const RECORD_SEARCH_CANDIDATE_SELECT = 'id, title_name, authors, timestamp';
 
 let cachedClient: SupabaseClient | null = null;
 
@@ -303,26 +324,37 @@ function coverage(field: string | null | undefined, tokens: string[]): number {
   return hits / tokens.length;
 }
 
-function scoreRecord(rec: RecordWithDetails, tokens: string[], phrase: string): number {
+interface SearchCandidate {
+  id: number;
+  title_name: string | null;
+  authors: string | null;
+  timestamp: string | null;
+}
+
+/**
+ * Rank a candidate on its high-signal fields only (title + authors).
+ *
+ * Body text (summary / conclusion) is intentionally not fetched for scoring —
+ * see RECORD_SEARCH_CANDIDATE_SELECT. Every candidate reached us because
+ * PostgREST already matched the query against title / authors / summary /
+ * conclusion, so a row scoring 0 here is a body-only match: still relevant,
+ * just ranked below title and author hits via BODY_MATCH_SCORE.
+ */
+const BODY_MATCH_SCORE = 0.5;
+
+function scoreCandidate(rec: SearchCandidate, tokens: string[], phrase: string): number {
   const title = rec.title_name ?? '';
   const authors = rec.authors ?? '';
-  const summary = rec.summary ?? '';
-  const conclusion = rec.conclusion ?? '';
 
-  let score =
-    4.0 * coverage(title, tokens) +
-    2.0 * coverage(authors, tokens) +
-    1.5 * coverage(summary, tokens) +
-    1.2 * coverage(conclusion, tokens);
+  let score = 4.0 * coverage(title, tokens) + 2.0 * coverage(authors, tokens);
 
   const lowerPhrase = phrase.toLowerCase();
   if (lowerPhrase.length >= 3) {
     if (title.toLowerCase().includes(lowerPhrase)) score += 5;
-    else if (summary.toLowerCase().includes(lowerPhrase)) score += 2;
-    else if (conclusion.toLowerCase().includes(lowerPhrase)) score += 2;
     else if (authors.toLowerCase().includes(lowerPhrase)) score += 2;
   }
-  return score;
+
+  return score > 0 ? score : BODY_MATCH_SCORE;
 }
 
 async function keywordSearch(
@@ -361,9 +393,10 @@ async function keywordSearch(
     orClauses.push(`conclusion.ilike.%${t}%`);
   }
 
+  // Phase 1 — rank a cheap candidate pool (ids + title + authors only).
   let candidateQuery: any = supabase
     .from('records')
-    .select(RECORD_LIST_SELECT)
+    .select(RECORD_SEARCH_CANDIDATE_SELECT)
     .limit(SEARCH_CANDIDATE_CAP);
 
   if (restrictedIds && restrictedIds.length > 0) {
@@ -380,15 +413,14 @@ async function keywordSearch(
     throw error;
   }
 
-  const sanitised = sanitiseDeep((data ?? []) as RecordWithDetails[]);
+  const sanitised = sanitiseDeep((data ?? []) as SearchCandidate[]);
 
   const yearStart = filters.yearRange?.start;
   const yearEnd = filters.yearRange?.end;
 
   const ranked = sanitised
-    .map((rec) => ({ rec, relevance: scoreRecord(rec, tokens, phrase) }))
-    .filter(({ rec, relevance }) => {
-      if (relevance <= 0) return false;
+    .map((rec) => ({ rec, relevance: scoreCandidate(rec, tokens, phrase) }))
+    .filter(({ rec }) => {
       if (yearStart || yearEnd) {
         const year = extractYear(rec.timestamp);
         if (year === null) return false;
@@ -400,17 +432,29 @@ async function keywordSearch(
     .sort((a, b) => {
       if (b.relevance !== a.relevance) return b.relevance - a.relevance;
       return (extractYear(b.rec.timestamp) ?? 0) - (extractYear(a.rec.timestamp) ?? 0);
-    })
-    .map(({ rec, relevance }) => {
-      const { extracted_text: _text, ...rest } = rec as RecordWithDetails & {
-        extracted_text?: unknown;
-      };
-      return { ...(rest as RecordWithDetails), relevance };
     });
 
   const count = ranked.length;
   const from = (page - 1) * pageSize;
-  const pageData = ranked.slice(from, from + pageSize);
+  const pageSlice = ranked.slice(from, from + pageSize);
+
+  if (pageSlice.length === 0) {
+    return { data: [], count, page, pageSize, totalPages: count ? Math.ceil(count / pageSize) : 0 };
+  }
+
+  // Phase 2 — hydrate only the rows this page will actually render.
+  const pageIds = pageSlice.map(({ rec }) => rec.id);
+  const relevanceById = new Map(pageSlice.map(({ rec, relevance }) => [rec.id, relevance]));
+
+  const { data: fullRows, error: hydrateError } = await supabase
+    .from('records')
+    .select(RECORD_LIST_SELECT)
+    .in('id', pageIds);
+  if (hydrateError) throw hydrateError;
+
+  const pageData = finalizeRecords(fullRows)
+    .map((rec) => ({ ...rec, relevance: relevanceById.get(rec.id) ?? 0 }))
+    .sort((a, b) => pageIds.indexOf(a.id) - pageIds.indexOf(b.id));
 
   return {
     data: pageData,
@@ -434,6 +478,36 @@ export async function fetchRecordsWithFilters({
   const supabase = getSupabaseClient();
   const f = normaliseFilters(filters);
 
+  const effectiveSort: SortOption =
+    sort === 'relevance' || !sort ? 'title_asc' : sort;
+
+  // Random sort still varies per request (the shuffle happens in memory), but
+  // every other result set — including keyword search, which previously
+  // bypassed the cache entirely — is served read-through.
+  if (effectiveSort !== 'random') {
+    const cacheKey = JSON.stringify({ page, pageSize, sort: effectiveSort, filters: f });
+    return withCache(cacheKey, RECORDS_CACHE_TTL, () =>
+      loadRecords(supabase, { page, pageSize, filters: f, effectiveSort }),
+    );
+  }
+
+  return loadRecords(supabase, { page, pageSize, filters: f, effectiveSort });
+}
+
+async function loadRecords(
+  supabase: SupabaseClient,
+  {
+    page,
+    pageSize,
+    filters: f,
+    effectiveSort,
+  }: {
+    page: number;
+    pageSize: number;
+    filters: SearchFilters;
+    effectiveSort: SortOption;
+  },
+): Promise<PaginatedResponse<RecordWithDetails>> {
   const languageVariants = f.language
     ? await resolveLanguageVariants(supabase, f.language)
     : null;
@@ -455,32 +529,31 @@ export async function fetchRecordsWithFilters({
     });
   }
 
-  const effectiveSort: SortOption =
-    sort === 'relevance' || !sort ? 'title_asc' : sort;
-
-  const shouldUseCache = effectiveSort !== 'random';
-  const cacheKey = shouldUseCache
-    ? JSON.stringify({ page, pageSize, sort: effectiveSort, filters: f })
-    : null;
-
-  if (shouldUseCache && cacheKey) {
-    const cached = await readCache<PaginatedResponse<RecordWithDetails>>(
-      cacheKey,
-      RECORDS_CACHE_TTL,
-    );
-    if (cached) return cached;
-  }
-
-  // Random sort: pick a shuffle of matching ids, then page.
+  // Random sort: pick a shuffle of matching ids, then page. The id pool is the
+  // expensive half and does not depend on the shuffle, so it is cached — the
+  // ordering stays random on every request, at no egress cost after the first.
   if (effectiveSort === 'random') {
-    let idsQuery: any = supabase.from('records').select('id', { count: 'exact' });
-    if (restrictedIds && restrictedIds.length > 0) idsQuery = idsQuery.in('id', restrictedIds);
-    idsQuery = applyColumnFilters(idsQuery, f, languageVariants);
+    const poolKey = JSON.stringify({
+      pool: 'random-ids-v1',
+      filters: f,
+      languageVariants,
+      restrictedIds,
+    });
 
-    const { data: idRows, error: idsError, count } = await idsQuery;
-    if (idsError) throw idsError;
+    const { allIds, count } = await withCache(poolKey, RECORDS_CACHE_TTL, async () => {
+      let idsQuery: any = supabase.from('records').select('id', { count: 'exact' });
+      if (restrictedIds && restrictedIds.length > 0) idsQuery = idsQuery.in('id', restrictedIds);
+      idsQuery = applyColumnFilters(idsQuery, f, languageVariants);
 
-    const allIds: number[] = (idRows ?? []).map((r: { id: number }) => r.id);
+      const { data: idRows, error: idsError, count: total } = await idsQuery;
+      if (idsError) throw idsError;
+
+      return {
+        allIds: (idRows ?? []).map((r: { id: number }) => r.id) as number[],
+        count: (total ?? 0) as number,
+      };
+    });
+
     if (allIds.length === 0) {
       return { data: [], count: count ?? 0, page, pageSize, totalPages: 0 };
     }
@@ -521,16 +594,13 @@ export async function fetchRecordsWithFilters({
   const { data, error, count } = await query;
   if (error) throw error;
 
-  const response: PaginatedResponse<RecordWithDetails> = {
+  return {
     data: finalizeRecords(data),
     count: count ?? 0,
     page,
     pageSize,
     totalPages: count ? Math.ceil(count / pageSize) : 0,
   };
-
-  if (shouldUseCache && cacheKey) await writeCache(cacheKey, response);
-  return response;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -564,45 +634,121 @@ function pagePosition(value: string | null | undefined): number {
 export async function fetchRecordWithDetailsById(
   id: number,
 ): Promise<RecordWithDetails | null> {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('records')
-    .select(RECORD_SELECT)
-    .eq('id', id)
-    .single();
-  if (error) {
-    if ((error as { code?: string }).code === 'PGRST116') return null;
-    throw error;
-  }
-  return data ? finalizeRecords([data])[0] : null;
+  return withCache(
+    JSON.stringify({ record: 'detail-v1', id }),
+    RECORD_DETAIL_CACHE_TTL,
+    async () => {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from('records')
+        .select(RECORD_SELECT)
+        .eq('id', id)
+        .single();
+      if (error) {
+        if ((error as { code?: string }).code === 'PGRST116') return null;
+        throw error;
+      }
+      return data ? finalizeRecords([data])[0] : null;
+    },
+  );
 }
 
-/** Sibling articles in the same issue (same magazine + volume + number). */
+/**
+ * Sibling articles in the same issue (same magazine + volume + number).
+ *
+ * Uses the trimmed issue select, not RECORD_SELECT: every article in an issue
+ * asks for the same list, so this is both cached and ~20x smaller on the wire.
+ */
 export async function fetchRecordsFromSameIssue(
   record: RecordWithDetails,
 ): Promise<RecordWithDetails[]> {
   if (!record.magazine_id || !record.volume) return [];
-  const supabase = getSupabaseClient();
 
-  let q = supabase
-    .from('records')
-    .select(RECORD_SELECT)
-    .eq('magazine_id', record.magazine_id)
-    .eq('volume', record.volume);
-  if (record.number) q = q.eq('number', record.number);
+  const cacheKey = JSON.stringify({
+    issue: 'siblings-v2',
+    magazine: record.magazine_id,
+    volume: record.volume,
+    number: record.number ?? null,
+  });
 
-  const { data, error } = await q.limit(60);
-  if (error) throw error;
+  return withCache(cacheKey, RECORD_DETAIL_CACHE_TTL, async () => {
+    const supabase = getSupabaseClient();
 
-  return finalizeRecords(data).sort(
-    (a, b) => pagePosition(a.page_numbers) - pagePosition(b.page_numbers) || a.id - b.id,
-  );
+    let q = supabase
+      .from('records')
+      .select(RECORD_ISSUE_SELECT)
+      .eq('magazine_id', record.magazine_id)
+      .eq('volume', record.volume);
+    if (record.number) q = q.eq('number', record.number);
+
+    const { data, error } = await q.limit(60);
+    if (error) throw error;
+
+    return finalizeRecords(data).sort(
+      (a, b) => pagePosition(a.page_numbers) - pagePosition(b.page_numbers) || a.id - b.id,
+    );
+  });
+}
+
+/**
+ * "Continue reading" strip on an article page.
+ *
+ * Kept separate from fetchRecordsWithFilters' random path on purpose: that path
+ * cannot cache its result (the shuffle differs per request), which meant one
+ * uncached query on every single article view. Here the *result* is cached per
+ * tag / magazine bucket, so the ordering still varies between buckets and over
+ * time, but a crawler walking the whole archive no longer costs one query per
+ * page.
+ */
+export async function fetchRelatedRecords(
+  record: RecordWithDetails,
+  limit = 9,
+): Promise<RecordWithDetails[]> {
+  const firstTag = record.record_tags?.[0]?.tags?.id;
+  if (!firstTag && !record.magazine_id) return [];
+
+  const cacheKey = JSON.stringify({
+    related: 'v1',
+    tag: firstTag ?? null,
+    magazine: firstTag ? null : record.magazine_id,
+    limit,
+  });
+
+  return withCache(cacheKey, RECORD_DETAIL_CACHE_TTL, async () => {
+    const filters: SearchFilters = firstTag
+      ? { tags: [firstTag] }
+      : { magazineId: record.magazine_id ?? undefined };
+    const response = await fetchRecordsWithFilters({
+      page: 1,
+      pageSize: limit,
+      filters,
+      sort: 'random',
+    });
+    return response.data;
+  });
 }
 
 export async function fetchVolumeIssueSequence(
   record: RecordWithDetails,
 ): Promise<VolumeIssueNavItem[]> {
   if (!record.magazine_id || !record.volume) return [];
+
+  // Shared by every article in the volume — one of the highest-value cache
+  // keys here, since it pulls up to 1000 rows.
+  const cacheKey = JSON.stringify({
+    sequence: 'volume-v1',
+    magazine: record.magazine_id,
+    volume: record.volume,
+  });
+
+  return withCache(cacheKey, RECORD_DETAIL_CACHE_TTL, () =>
+    loadVolumeIssueSequence(record),
+  );
+}
+
+async function loadVolumeIssueSequence(
+  record: RecordWithDetails,
+): Promise<VolumeIssueNavItem[]> {
   const supabase = getSupabaseClient();
 
   const { data, error } = await supabase
@@ -658,10 +804,14 @@ export async function fetchVolumeIssueSequence(
 /* -------------------------------------------------------------------------- */
 
 export async function fetchAllMagazinesWithStats(): Promise<MagazineWithStats[]> {
-  const cacheKey = JSON.stringify({ magazines: 'stats-v1' });
-  const cached = await readCache<MagazineWithStats[]>(cacheKey, LOOKUP_CACHE_TTL);
-  if (cached) return cached;
+  return withCache(
+    JSON.stringify({ magazines: 'stats-v1' }),
+    LOOKUP_CACHE_TTL,
+    loadAllMagazinesWithStats,
+  );
+}
 
+async function loadAllMagazinesWithStats(): Promise<MagazineWithStats[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('magazines')
@@ -682,12 +832,9 @@ export async function fetchAllMagazinesWithStats(): Promise<MagazineWithStats[]>
     }),
   );
 
-  const result = withStats
+  return withStats
     .filter((m) => m.recordCount > 0)
     .sort((a, b) => b.recordCount - a.recordCount);
-
-  await writeCache(cacheKey, result);
-  return result;
 }
 
 export async function fetchMagazineBySlug(
@@ -723,11 +870,19 @@ export interface LanguageFacet {
   count: number;
 }
 
+/**
+ * Language filter options, derived by scanning `language_legacy` across the
+ * whole table (there is no distinct-value endpoint in PostgREST). That is ~9
+ * paged requests over 8.5k rows, so it must stay behind the 24h lookup cache —
+ * the values only change when the archive is re-imported.
+ */
 async function fetchLanguageFacets(supabase: SupabaseClient): Promise<LanguageFacet[]> {
-  const cacheKey = JSON.stringify({ facet: 'languages-v1' });
-  const cached = await readCache<LanguageFacet[]>(cacheKey, LOOKUP_CACHE_TTL);
-  if (cached) return cached;
+  return withCache(JSON.stringify({ facet: 'languages-v1' }), LOOKUP_CACHE_TTL, () =>
+    loadLanguageFacets(supabase),
+  );
+}
 
+async function loadLanguageFacets(supabase: SupabaseClient): Promise<LanguageFacet[]> {
   // Pull the raw language values in pages (client caps at 1000 rows/request).
   const raw: (string | null)[] = [];
   const pageSize = 1000;
@@ -752,16 +907,13 @@ async function fetchLanguageFacets(supabase: SupabaseClient): Promise<LanguageFa
     groups.set(label, entry);
   }
 
-  const facets: LanguageFacet[] = Array.from(groups.entries())
+  return Array.from(groups.entries())
     .map(([label, { variants, count }]) => ({
       label,
       variants: Array.from(variants),
       count,
     }))
     .sort((a, b) => b.count - a.count);
-
-  await writeCache(cacheKey, facets);
-  return facets;
 }
 
 export async function fetchLanguages(): Promise<LanguageFacet[]> {
@@ -769,20 +921,15 @@ export async function fetchLanguages(): Promise<LanguageFacet[]> {
 }
 
 async function fetchLookup<T>(table: 'tags' | 'authors', ttl: number): Promise<T[]> {
-  const cacheKey = JSON.stringify({ table });
-  const cached = await readCache<T[]>(cacheKey, ttl);
-  if (cached) return cached;
-
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from(table)
-    .select('*')
-    .order('name', { ascending: true });
-  if (error) throw error;
-
-  const result = (data ?? []) as T[];
-  await writeCache(cacheKey, result);
-  return result;
+  return withCache(JSON.stringify({ table }), ttl, async () => {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as T[];
+  });
 }
 
 export async function fetchAllAuthors(): Promise<Author[]> {
