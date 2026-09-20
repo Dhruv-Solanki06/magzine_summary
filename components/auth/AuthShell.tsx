@@ -15,8 +15,16 @@ interface AuthShellProps {
 export function AuthShell({ title, subtitle, children, footer }: AuthShellProps) {
   return (
     <div className="min-h-screen bg-white">
+      {/*
+        Every auth surface renders through this shell, so the noindex lives here
+        rather than being repeated (and eventually forgotten) on each page.
+        robots.txt already disallows these paths, but Disallow only stops the
+        fetch — a URL linked from elsewhere can still be indexed unfetched.
+        noindex is what actually keeps sign-in pages out of the results.
+      */}
       <Head>
         <title>{`${title} | ${SITE_NAME}`}</title>
+        <meta name="robots" content="noindex, nofollow" key="robots" />
       </Head>
       <Header />
       <main

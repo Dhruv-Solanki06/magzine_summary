@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Camera, Check, Loader2, Plus } from 'lucide-react';
@@ -20,6 +19,7 @@ import {
   type ProfileWork,
 } from '@/lib/profiles';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
 
 const inputClass =
   'w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-black/85 outline-none placeholder:text-black/35 focus:ring-1 focus:ring-black/25';
@@ -261,9 +261,12 @@ export default function ProfileEditPage() {
 
   return (
     <>
-      <Head>
-        <title>{`Edit profile | ${SITE_NAME}`}</title>
-      </Head>
+      <Seo
+        title="Edit profile"
+        description="Edit your researcher profile."
+        path="/profile/edit"
+        noindex
+      />
       <div className="min-h-screen bg-white">
         <Header />
         <main className="mx-auto max-w-[720px] px-5 pb-28 pt-8 sm:px-10">

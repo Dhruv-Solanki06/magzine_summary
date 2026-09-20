@@ -45,3 +45,7 @@ Crawl-delay: 30
 
 User-agent: DotBot
 Crawl-delay: 30
+
+# Sitemap. Generated on request by pages/sitemap.xml.ts — every article, journal
+# and subject page in the archive. Must be an absolute URL per the spec.
+Sitemap: https://aryanculture.org/sitemap.xml

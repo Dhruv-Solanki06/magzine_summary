@@ -1,6 +1,5 @@
 // pages/subjects/[slug].tsx — a broad subject: sub-topics + its records
 import React, { useCallback } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
@@ -15,6 +14,8 @@ import { SORT_LABELS } from '@/components/browse/FilterBar';
 import { coverTheme } from '@/lib/covers';
 import { formatCount } from '@/lib/format';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import { buildBreadcrumbJsonLd, buildCollectionPageJsonLd } from '@/lib/seo';
 import type { RecordWithDetails, SortOption } from '@/types';
 import type { SubsubjectWithCount } from '@/lib/server/subjects';
 
@@ -70,10 +71,28 @@ const SubjectDetailPage: NextPage<SubjectDetailProps> = ({
 
   return (
     <>
-      <Head>
-        <title>{`${subject.name} | ${SITE_NAME}`}</title>
-        <meta name="description" content={subject.description ?? subject.name} />
-      </Head>
+      <Seo
+        title={subject.name}
+        description={
+          subject.description ??
+          `Articles on ${subject.name} in the ${SITE_NAME} archive.`
+        }
+        path={`/subjects/${subject.slug}`}
+        jsonLd={[
+          buildCollectionPageJsonLd({
+            name: subject.name,
+            description:
+              subject.description ??
+              `Articles on ${subject.name} in the ${SITE_NAME} archive.`,
+            path: `/subjects/${subject.slug}`,
+          }),
+          buildBreadcrumbJsonLd([
+            { name: SITE_NAME, path: '/' },
+            { name: 'Subjects', path: '/subjects' },
+            { name: subject.name, path: `/subjects/${subject.slug}` },
+          ]),
+        ]}
+      />
       <div className="min-h-screen bg-white">
         <Header />
 

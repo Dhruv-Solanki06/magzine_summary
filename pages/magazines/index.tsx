@@ -1,6 +1,5 @@
 // pages/magazines/index.tsx — browse the collection by magazine
 import React from 'react';
-import Head from 'next/head';
 import type { GetServerSideProps, NextPage } from 'next';
 
 import Header from '@/components/common/Header';
@@ -8,6 +7,8 @@ import MagazineCard from '@/components/browse/MagazineCard';
 import type { MagazineWithStats } from '@/types';
 import { formatCount } from '@/lib/format';
 import { SITE_DESCRIPTION, SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import { buildCollectionPageJsonLd } from '@/lib/seo';
 
 interface MagazinesPageProps {
   magazines: MagazineWithStats[];
@@ -17,13 +18,17 @@ interface MagazinesPageProps {
 const MagazinesPage: NextPage<MagazinesPageProps> = ({ magazines, totalArticles }) => {
   return (
     <>
-      <Head>
-        <title>{`Publications | ${SITE_NAME}`}</title>
-        <meta
-          name="description"
-          content={SITE_DESCRIPTION}
-        />
-      </Head>
+      <Seo
+        title="Publications"
+        description={`Browse ${formatCount(magazines.length)} journals and periodicals in the ${SITE_NAME} archive, spanning Indic philosophy, scripture, history and art.`}
+        path="/magazines"
+        jsonLd={buildCollectionPageJsonLd({
+          name: 'Publications',
+          description: SITE_DESCRIPTION,
+          path: '/magazines',
+          itemCount: magazines.length,
+        })}
+      />
       <div className="min-h-screen bg-white">
         <Header />
 

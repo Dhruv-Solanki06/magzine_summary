@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import { LogIn, Star, Trash2, UserPlus } from 'lucide-react';
 
@@ -9,6 +8,7 @@ import Header from '@/components/common/Header';
 import { useFavoriteAuthors } from '@/lib/useLibrary';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
 
 export default function FavoritesPage() {
   const { favorites, remove, loading } = useFavoriteAuthors();
@@ -16,9 +16,12 @@ export default function FavoritesPage() {
 
   return (
     <>
-      <Head>
-        <title>{`Favorite authors | ${SITE_NAME}`}</title>
-      </Head>
+      <Seo
+        title="Favorite authors"
+        description="Authors you follow."
+        path="/favorites"
+        noindex
+      />
       <div className="min-h-screen bg-white">
         <Header />
         <main className="mx-auto max-w-[900px] px-4 pb-16 pt-8 sm:px-6 lg:px-10">

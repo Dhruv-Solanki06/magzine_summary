@@ -6,7 +6,6 @@
 // board where notes can be jotted down standalone or attached to an article.
 
 import React, { useMemo, useState } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import {
   BookOpenCheck,
@@ -32,6 +31,7 @@ import {
 } from '@/lib/useReadingTracker';
 import { formatCount, formatDuration, formatRelativeTime } from '@/lib/format';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
 
 const STATUS_ORDER: NoteStatus[] = ['idea', 'reading', 'done', 'archived'];
 
@@ -363,10 +363,12 @@ export default function TrackerPage() {
 
   return (
     <>
-      <Head>
-        <title>{`Research tracker | ${SITE_NAME}`}</title>
-        <meta name="description" content="Track your reading time, history and research notes." />
-      </Head>
+      <Seo
+        title="Research tracker"
+        description="Track your reading time, history and research notes."
+        path="/tracker"
+        noindex
+      />
       <div className="min-h-screen bg-white">
         <Header />
         <main className="mx-auto w-full max-w-[1000px] px-4 pb-20 pt-8 sm:px-6 lg:px-10">

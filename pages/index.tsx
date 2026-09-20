@@ -1,6 +1,5 @@
 // pages/index.tsx — Article repository browse (home)
 import React, { useCallback, useMemo } from 'react';
-import Head from 'next/head';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { X } from 'lucide-react';
@@ -28,6 +27,8 @@ import {
   SITE_NAME,
   SITE_URL,
 } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import { buildOrganizationJsonLd, buildWebSiteJsonLd } from '@/lib/seo';
 
 interface BrowsePageProps {
   records: RecordWithDetails[];
@@ -150,17 +151,12 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
 
   return (
     <>
-      <Head>
-        <title>{`${SITE_NAME} | Cultural Article Archive`}</title>
-        <meta
-          name="description"
-          content={SITE_DESCRIPTION}
-        />
-        <meta property="og:title" content={`${SITE_NAME} | Cultural Article Archive`} />
-        <meta property="og:description" content={SITE_DESCRIPTION} />
-        <meta property="og:url" content={SITE_URL} />
-        <meta property="og:image" content={`${SITE_URL}${HERITAGE_ASSETS[0].src}`} />
-      </Head>
+      <Seo
+        description={SITE_DESCRIPTION}
+        path="/"
+        image={`${SITE_URL}${HERITAGE_ASSETS[0].src}`}
+        jsonLd={[buildWebSiteJsonLd(), buildOrganizationJsonLd()]}
+      />
       <div className="min-h-screen bg-white">
         <Header />
 

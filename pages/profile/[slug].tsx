@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import type { GetServerSideProps, NextPage } from 'next';
 import { PencilLine } from 'lucide-react';
@@ -13,6 +12,7 @@ import ProjectTile from '@/components/profile/ProjectTile';
 import { useAuth } from '@/components/auth/AuthProvider';
 import type { ProfileWithWorks } from '@/lib/profiles';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
 
 interface Props {
   profile: ProfileWithWorks | null;
@@ -53,10 +53,11 @@ const ProfilePage: NextPage<Props> = ({ profile }) => {
 
   return (
     <>
-      <Head>
-        <title>{`${displayName} | ${SITE_NAME}`}</title>
-        <meta name="description" content={(profile.bio || `${displayName} on ${SITE_NAME}`).slice(0, 160)} />
-      </Head>
+      <Seo
+        title={displayName}
+        description={profile.bio || `${displayName} on ${SITE_NAME}`}
+        path={`/profile/${profile.username ?? ''}`}
+      />
       <div className="min-h-screen bg-white">
         <Header />
         <main className="relative mx-auto box-content max-w-[670px] px-5 pt-8 pb-[100px] sm:px-10">

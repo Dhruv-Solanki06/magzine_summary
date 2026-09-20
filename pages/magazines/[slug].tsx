@@ -1,6 +1,5 @@
 // pages/magazines/[slug].tsx — a single magazine: hero + its articles
 import React, { useCallback } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
@@ -14,6 +13,8 @@ import Pagination from '@/components/browse/Pagination';
 import { coverTheme } from '@/lib/covers';
 import { formatCount } from '@/lib/format';
 import { heritageAssetForSeed, SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import { buildBreadcrumbJsonLd, buildMagazineJsonLd } from '@/lib/seo';
 
 import type {
   Author,
@@ -117,16 +118,22 @@ const MagazineDetailPage: NextPage<MagazineDetailProps> = ({
 
   return (
     <>
-      <Head>
-        <title>{`${magazine.name} | ${SITE_NAME}`}</title>
-        <meta
-          name="description"
-          content={
-            magazine.description ||
-            `${formatCount(magazine.recordCount)} archived articles from ${magazine.name}.`
-          }
-        />
-      </Head>
+      <Seo
+        title={magazine.name}
+        description={
+          magazine.description ||
+          `${formatCount(magazine.recordCount)} archived articles from ${magazine.name}.`
+        }
+        path={`/magazines/${magazine.slug}`}
+        jsonLd={[
+          buildMagazineJsonLd(magazine),
+          buildBreadcrumbJsonLd([
+            { name: SITE_NAME, path: '/' },
+            { name: 'Publications', path: '/magazines' },
+            { name: magazine.name, path: `/magazines/${magazine.slug}` },
+          ]),
+        ]}
+      />
       <div className="min-h-screen bg-white">
         <Header />
 

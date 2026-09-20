@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Loader2 } from 'lucide-react';
 
@@ -9,6 +8,7 @@ import Header from '@/components/common/Header';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { getSupabaseBrowserClient } from '@/lib/supabase/auth-client';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
 
 export default function ProfileRedirectPage() {
   const router = useRouter();
@@ -44,9 +44,12 @@ export default function ProfileRedirectPage() {
 
   return (
     <>
-      <Head>
-        <title>{`Profile | ${SITE_NAME}`}</title>
-      </Head>
+      <Seo
+        title="Profile"
+        description="Your researcher profile."
+        path="/profile"
+        noindex
+      />
       <div className="min-h-screen bg-white">
         <Header />
         <main className="mx-auto flex max-w-[670px] items-center justify-center px-5 pt-24">

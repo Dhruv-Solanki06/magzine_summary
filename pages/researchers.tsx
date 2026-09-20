@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Head from 'next/head';
 import type { GetServerSideProps, NextPage } from 'next';
 import { Search, SlidersHorizontal, ChevronDown, Loader2 } from 'lucide-react';
 
@@ -18,6 +17,8 @@ import {
   type ResearcherSortValue,
 } from '@/lib/profiles';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import { buildCollectionPageJsonLd } from '@/lib/seo';
 
 interface Props {
   initial: ResearcherSearchResults;
@@ -119,13 +120,17 @@ const ResearchersPage: NextPage<Props> = ({ initial }) => {
 
   return (
     <>
-      <Head>
-        <title>{`Researchers | ${SITE_NAME}`}</title>
-        <meta
-          name="description"
-          content="Discover researchers, their publications and projects. Find people who share your interests."
-        />
-      </Head>
+      <Seo
+        title="Researchers"
+        description="Discover researchers, their publications and projects. Find people who share your interests."
+        path="/researchers"
+        jsonLd={buildCollectionPageJsonLd({
+          name: 'Researchers',
+          description:
+            'Discover researchers, their publications and projects in the Aryan Culture archive.',
+          path: '/researchers',
+        })}
+      />
       <div className="min-h-screen bg-white text-[#171717]">
         <Header />
         <main className="mx-auto max-w-[1280px] px-4 pb-24 pt-8 sm:px-6 lg:px-10">

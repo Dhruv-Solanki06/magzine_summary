@@ -1,6 +1,5 @@
 // pages/records/[id].tsx — single article detail (SSR)
 import React, { useCallback, useMemo } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import type { GetServerSideProps, NextPage } from 'next';
 import { useRouter } from 'next/router';
@@ -16,10 +15,17 @@ import ReportContentButton from '@/components/records/ReportContentButton';
 import ArticleGrid from '@/components/browse/ArticleGrid';
 import type { RecordWithDetails } from '@/types';
 import type { VolumeIssueNavItem } from '@/lib/server/records';
-import { magazineName } from '@/lib/format';
+import { magazineName, magazineSlug } from '@/lib/format';
 import { useBookmarks, useFavoriteAuthors } from '@/lib/useLibrary';
 import { useArticleReadingTimer } from '@/lib/useReadingTracker';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import {
+  buildBreadcrumbJsonLd,
+  buildRecordJsonLd,
+  recordDescription,
+  socialImageForRecord,
+} from '@/lib/seo';
 import { AI_CHAT_ENABLED } from '@/lib/features';
 
 interface RecordDetailProps {
@@ -71,10 +77,23 @@ const RecordDetailPage: NextPage<RecordDetailProps> = ({
 
   return (
     <>
-      <Head>
-        <title>{`${record.title_name || 'Article'} | ${SITE_NAME}`}</title>
-        <meta name="description" content={(record.summary || '').slice(0, 160)} />
-      </Head>
+      <Seo
+        title={record.title_name || 'Article'}
+        description={recordDescription(record)}
+        path={`/records/${record.id}`}
+        type="article"
+        image={socialImageForRecord(record)}
+        jsonLd={[
+          buildRecordJsonLd(record),
+          buildBreadcrumbJsonLd([
+            { name: SITE_NAME, path: '/' },
+            ...(magazineSlug(record)
+              ? [{ name: magazineName(record), path: `/magazines/${magazineSlug(record)}` }]
+              : [{ name: 'Articles', path: '/' }]),
+            { name: record.title_name || 'Article', path: `/records/${record.id}` },
+          ]),
+        ]}
+      />
       <div className="min-h-screen bg-white">
         <Header />
 

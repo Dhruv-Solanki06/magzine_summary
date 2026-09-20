@@ -1,6 +1,5 @@
 // pages/subjects/index.tsx — browse the archive by broad subject area
 import React from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import type { GetServerSideProps, NextPage } from 'next';
 import { ArrowUpRight, FileText } from 'lucide-react';
@@ -9,6 +8,8 @@ import Header from '@/components/common/Header';
 import { coverTheme } from '@/lib/covers';
 import { formatCount } from '@/lib/format';
 import { SITE_NAME } from '@/lib/brand';
+import Seo from '@/components/common/Seo';
+import { buildCollectionPageJsonLd } from '@/lib/seo';
 import { SUBJECTS as TAXONOMY } from '@/lib/taxonomy';
 import type { SubjectWithCount } from '@/lib/server/subjects';
 
@@ -22,13 +23,18 @@ const SubjectsPage: NextPage<SubjectsPageProps> = ({ ready, subjects }) => {
 
   return (
     <>
-      <Head>
-        <title>{`Subjects | ${SITE_NAME}`}</title>
-        <meta
-          name="description"
-          content="Browse the archive by broad subject area — philosophy, history, art, literature, scripture and more."
-        />
-      </Head>
+      <Seo
+        title="Subjects"
+        description="Browse the archive by broad subject area — philosophy, history, art, literature, scripture and more."
+        path="/subjects"
+        jsonLd={buildCollectionPageJsonLd({
+          name: 'Subjects',
+          description:
+            'Browse the archive by broad subject area — philosophy, history, art, literature, scripture and more.',
+          path: '/subjects',
+          itemCount: subjects.length,
+        })}
+      />
       <div className="min-h-screen bg-white">
         <Header />
         <main className="w-full px-4 pb-16 pt-8 sm:px-6 lg:px-10 xl:px-14">
