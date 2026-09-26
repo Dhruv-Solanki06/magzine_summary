@@ -1,6 +1,6 @@
 // pages/sitemap.xml.ts — the archive's sitemap, generated on request.
 //
-// ~8.7k article URLs plus the browse surfaces. That is comfortably inside the
+// ~8.7k article URLs plus the browse surfaces and public researcher profiles. That is comfortably inside the
 // 50,000-URL / 50 MB limit for a single sitemap, so there is no index file to
 // keep in sync. If the archive ever passes ~45k records, split this into a
 // sitemap index rather than letting it silently overflow.
@@ -86,6 +86,24 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
         loc: `${SITE_URL}/subjects/${subject.slug}`,
         changefreq: 'weekly',
         priority: '0.6',
+      });
+    }
+  }
+
+  // Public researcher profiles. Unpublished ones render with noindex, so
+  // listing them here would only send crawlers to pages they must drop.
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('is_public', true)
+    .not('username', 'is', null);
+
+  for (const profile of profiles ?? []) {
+    if (profile.username) {
+      urls.push({
+        loc: `${SITE_URL}/profile/${encodeURIComponent(profile.username)}`,
+        changefreq: 'monthly',
+        priority: '0.4',
       });
     }
   }

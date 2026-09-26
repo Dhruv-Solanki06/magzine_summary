@@ -5,6 +5,7 @@
 
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/brand';
 import { authorLabel, bestSummary, extractYear, magazineName } from '@/lib/format';
+import type { Profile } from '@/lib/profiles';
 import type { MagazineWithStats, RecordWithDetails } from '@/types';
 
 /** Join a site-root-relative path onto the canonical origin. */
@@ -78,6 +79,7 @@ export function buildWebSiteJsonLd(): JsonLd {
     alternateName: 'Aryan Culture Archive',
     url: SITE_URL,
     description: SITE_DESCRIPTION,
+    inLanguage: 'en',
     potentialAction: {
       '@type': 'SearchAction',
       target: {
@@ -250,4 +252,75 @@ export function recordDescription(record: RecordWithDetails): string {
       .filter(Boolean)
       .join(' '),
   );
+}
+
+/**
+ * Query keys that turn a listing into a search/filter/pagination view. Those
+ * views are a combinatorial space over the same articles, so they get
+ * `noindex, follow`: kept out of the index, but their links still crawled.
+ * Unrelated params (utm_*, fbclid) deliberately do not count.
+ */
+const LISTING_VIEW_KEYS = [
+  'search',
+  'tags',
+  'authors',
+  'sort',
+  'language',
+  'yearStart',
+  'yearEnd',
+  'magazineId',
+  'page',
+];
+
+export function isListingView(query: globalThis.Record<string, unknown>): boolean {
+  return LISTING_VIEW_KEYS.some((key) => {
+    const value = query[key];
+    if (value === undefined || value === '') return false;
+    // ?page=1 is the same page as no page param.
+    if (key === 'page') return Number(value) > 1;
+    return true;
+  });
+}
+
+/** Links that are safe to publish as `sameAs` — never email. */
+function httpUrl(raw: string | null | undefined): string | undefined {
+  const value = raw?.trim();
+  return value && /^https?:\/\//i.test(value) ? value : undefined;
+}
+
+/**
+ * A public researcher profile. ProfilePage wrapping a Person is the shape
+ * Google documents for profile pages; `sameAs` ties the person to their
+ * ORCID / Scholar / LinkedIn identities so the entities can be merged.
+ */
+export function buildProfileJsonLd(profile: Profile): JsonLd {
+  const name = profile.display_name || profile.username || 'Researcher';
+  const path = `/profile/${profile.username}`;
+  const orcid = profile.orcid?.trim();
+  const sameAs = [
+    httpUrl(profile.website),
+    httpUrl(profile.linkedin),
+    httpUrl(profile.twitter),
+    httpUrl(profile.github),
+    httpUrl(profile.scholar),
+    orcid ? httpUrl(orcid) ?? `https://orcid.org/${orcid}` : undefined,
+  ].filter((url): url is string => Boolean(url));
+
+  const person: JsonLd = {
+    '@type': 'Person',
+    name,
+    url: absoluteUrl(path),
+  };
+  if (profile.username) person.alternateName = profile.username;
+  if (profile.tagline) person.description = metaText(profile.tagline, 200);
+  if (httpUrl(profile.avatar_url)) person.image = profile.avatar_url;
+  if (profile.interests?.length) person.knowsAbout = profile.interests;
+  if (sameAs.length > 0) person.sameAs = sameAs;
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ProfilePage',
+    url: absoluteUrl(path),
+    mainEntity: person,
+  };
 }

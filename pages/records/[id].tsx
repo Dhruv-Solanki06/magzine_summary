@@ -98,6 +98,33 @@ const RecordDetailPage: NextPage<RecordDetailProps> = ({
         <Header />
 
         <main className="mx-auto max-w-[1280px] px-4 pb-16 pt-4 sm:px-6 sm:pt-6 lg:px-10">
+          {/* Crawlable trail matching the BreadcrumbList JSON-LD above. */}
+          <nav aria-label="Breadcrumb" className="mb-3 text-[13px] text-black/45">
+            <ol className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <li>
+                <Link href="/" className="hover:text-black/80">
+                  {SITE_NAME}
+                </Link>
+              </li>
+              {magazineSlug(record) && (
+                <>
+                  <li aria-hidden="true">/</li>
+                  <li>
+                    <Link
+                      href={`/magazines/${magazineSlug(record)}`}
+                      className="hover:text-black/80"
+                    >
+                      {magazineName(record)}
+                    </Link>
+                  </li>
+                </>
+              )}
+              <li aria-hidden="true">/</li>
+              <li aria-current="page" className="max-w-[40ch] truncate text-black/62">
+                {record.title_name || 'Article'}
+              </li>
+            </ol>
+          </nav>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <button
               type="button"

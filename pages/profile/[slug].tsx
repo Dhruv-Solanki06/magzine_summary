@@ -13,50 +13,57 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import type { ProfileWithWorks } from '@/lib/profiles';
 import { SITE_NAME } from '@/lib/brand';
 import Seo from '@/components/common/Seo';
+import { buildBreadcrumbJsonLd, buildProfileJsonLd } from '@/lib/seo';
 
 interface Props {
-  profile: ProfileWithWorks | null;
+  profile: ProfileWithWorks;
 }
 
 const ProfilePage: NextPage<Props> = ({ profile }) => {
   const { user } = useAuth();
   const signedIn = Boolean(user);
-  const isMe = Boolean(user && profile && user.id === profile.user_id);
+  const isMe = Boolean(user && user.id === profile.user_id);
 
   const publications = useMemo(
-    () => (profile?.works ?? []).filter((w) => w.kind === 'publication'),
-    [profile?.works],
+    () => profile.works.filter((w) => w.kind === 'publication'),
+    [profile.works],
   );
   const projects = useMemo(
-    () => (profile?.works ?? []).filter((w) => w.kind === 'project'),
-    [profile?.works],
+    () => profile.works.filter((w) => w.kind === 'project'),
+    [profile.works],
   );
-
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-white">
-        <Header />
-        <main className="mx-auto box-content max-w-[670px] px-5 pt-20 pb-[100px] sm:px-10">
-          <h1 className="text-3xl tracking-[-0.7px] text-zinc-900">Profile not found</h1>
-          <p className="mt-2 text-zinc-500">
-            This researcher profile doesn&apos;t exist or isn&apos;t public yet.
-          </p>
-          <Link href="/researchers" className="mt-4 inline-block text-sm font-medium underline underline-offset-4">
-            Browse researchers
-          </Link>
-        </main>
-      </div>
-    );
-  }
 
   const displayName = profile.display_name || profile.username || 'Researcher';
 
   return (
     <>
       <Seo
-        title={displayName}
-        description={profile.bio || `${displayName} on ${SITE_NAME}`}
-        path={`/profile/${profile.username ?? ''}`}
+        title={profile.tagline ? `${displayName} — ${profile.tagline}` : displayName}
+        description={
+          profile.bio ||
+          [profile.tagline, `${displayName} is a researcher on ${SITE_NAME}.`]
+            .filter(Boolean)
+            .join('. ')
+        }
+        path={`/profile/${profile.username}`}
+        type="profile"
+        image={profile.avatar_url && /^https?:\/\//.test(profile.avatar_url) ? profile.avatar_url : undefined}
+        imageAlt={`${displayName} avatar`}
+        // Unpublished profiles are still reachable by link (their owner shares
+        // it while drafting), but must not be indexed until made public.
+        noindex={!profile.is_public}
+        jsonLd={
+          profile.is_public
+            ? [
+                buildProfileJsonLd(profile),
+                buildBreadcrumbJsonLd([
+                  { name: SITE_NAME, path: '/' },
+                  { name: 'Researchers', path: '/researchers' },
+                  { name: displayName, path: `/profile/${profile.username}` },
+                ]),
+              ]
+            : undefined
+        }
       />
       <div className="min-h-screen bg-white">
         <Header />
@@ -143,7 +150,9 @@ export const getServerSideProps: GetServerSideProps<Props> = async ({ params }) 
 
   const { fetchProfileBySlug } = await import('@/lib/server/profiles');
   const profile = await fetchProfileBySlug(slug);
-  if (!profile) return { props: { profile: null } };
+  // A real 404, not a 200 "not found" page — soft 404s get indexed and
+  // waste crawl budget.
+  if (!profile) return { notFound: true };
 
   return { props: { profile: JSON.parse(JSON.stringify(profile)) as ProfileWithWorks } };
 };

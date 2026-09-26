@@ -28,7 +28,7 @@ import {
   SITE_URL,
 } from '@/lib/brand';
 import Seo from '@/components/common/Seo';
-import { buildOrganizationJsonLd, buildWebSiteJsonLd } from '@/lib/seo';
+import { buildOrganizationJsonLd, buildWebSiteJsonLd, isListingView } from '@/lib/seo';
 
 interface BrowsePageProps {
   records: RecordWithDetails[];
@@ -154,6 +154,8 @@ const BrowsePage: NextPage<BrowsePageProps> = ({
       <Seo
         description={SITE_DESCRIPTION}
         path="/"
+        noindex={isListingView(router.query)}
+        followLinks
         image={`${SITE_URL}${HERITAGE_ASSETS[0].src}`}
         jsonLd={[buildWebSiteJsonLd(), buildOrganizationJsonLd()]}
       />

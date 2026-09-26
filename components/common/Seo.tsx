@@ -17,11 +17,19 @@ export interface SeoProps {
   description: string;
   /** Site-root-relative path of the canonical URL, e.g. `/records/5925`. */
   path: string;
-  /** og:type — `article` for a record, `website` for everything else. */
-  type?: 'website' | 'article';
+  /** og:type — `article` for a record, `profile` for a researcher, else `website`. */
+  type?: 'website' | 'article' | 'profile';
   image?: string;
+  /** Alt text for the social card image. */
+  imageAlt?: string;
   /** Private/behind-auth pages: keep them out of the index entirely. */
   noindex?: boolean;
+  /**
+   * With `noindex`, still let crawlers follow the page's links. Use for
+   * search/filter/paginated views: the view itself is a duplicate, but the
+   * articles it links to are exactly what we want discovered.
+   */
+  followLinks?: boolean;
   /** One or more JSON-LD documents. */
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
 }
@@ -34,7 +42,9 @@ export default function Seo({
   path,
   type = 'website',
   image,
+  imageAlt,
   noindex = false,
+  followLinks = false,
   jsonLd,
 }: SeoProps) {
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} | Indic Culture Archive`;
@@ -55,7 +65,11 @@ export default function Seo({
         without ever being fetched. noindex is what actually keeps it out.
       */}
       {noindex && (
-        <meta name="robots" content="noindex, nofollow" key="robots" />
+        <meta
+          name="robots"
+          content={followLinks ? 'noindex, follow' : 'noindex, nofollow'}
+          key="robots"
+        />
       )}
       {!noindex && (
         <meta
@@ -71,12 +85,14 @@ export default function Seo({
       <meta property="og:description" content={desc} key="og:description" />
       <meta property="og:url" content={canonical} key="og:url" />
       <meta property="og:image" content={socialImage} key="og:image" />
+      <meta property="og:image:alt" content={imageAlt || fullTitle} key="og:image:alt" />
       <meta property="og:locale" content="en_US" key="og:locale" />
 
       <meta name="twitter:card" content="summary_large_image" key="twitter:card" />
       <meta name="twitter:title" content={fullTitle} key="twitter:title" />
       <meta name="twitter:description" content={desc} key="twitter:description" />
       <meta name="twitter:image" content={socialImage} key="twitter:image" />
+      <meta name="twitter:image:alt" content={imageAlt || fullTitle} key="twitter:image:alt" />
 
       {documents.map((doc, index) => (
         <script

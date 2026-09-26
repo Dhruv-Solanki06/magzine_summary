@@ -15,7 +15,7 @@ import { coverTheme } from '@/lib/covers';
 import { formatCount } from '@/lib/format';
 import { SITE_NAME } from '@/lib/brand';
 import Seo from '@/components/common/Seo';
-import { buildBreadcrumbJsonLd, buildCollectionPageJsonLd } from '@/lib/seo';
+import { buildBreadcrumbJsonLd, buildCollectionPageJsonLd, isListingView } from '@/lib/seo';
 import type { RecordWithDetails, SortOption } from '@/types';
 import type { SubsubjectWithCount } from '@/lib/server/subjects';
 
@@ -72,6 +72,8 @@ const SubjectDetailPage: NextPage<SubjectDetailProps> = ({
   return (
     <>
       <Seo
+        noindex={isListingView(router.query)}
+        followLinks
         title={subject.name}
         description={
           subject.description ??

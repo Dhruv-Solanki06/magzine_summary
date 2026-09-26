@@ -14,7 +14,7 @@ import { coverTheme } from '@/lib/covers';
 import { formatCount } from '@/lib/format';
 import { heritageAssetForSeed, SITE_NAME } from '@/lib/brand';
 import Seo from '@/components/common/Seo';
-import { buildBreadcrumbJsonLd, buildMagazineJsonLd } from '@/lib/seo';
+import { buildBreadcrumbJsonLd, buildMagazineJsonLd, isListingView } from '@/lib/seo';
 
 import type {
   Author,
@@ -119,6 +119,8 @@ const MagazineDetailPage: NextPage<MagazineDetailProps> = ({
   return (
     <>
       <Seo
+        noindex={isListingView(router.query)}
+        followLinks
         title={magazine.name}
         description={
           magazine.description ||

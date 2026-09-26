@@ -15,36 +15,77 @@ Disallow: /*?*language=
 Disallow: /*?*yearStart=
 Disallow: /*?*yearEnd=
 Disallow: /*?*page=
+Disallow: /*?*magazineId=
 Disallow: /account
 Disallow: /bookmarks
 Disallow: /favorites
 Disallow: /tracker
 Disallow: /profile/edit
+Disallow: /profile$
 Disallow: /login
 Disallow: /signup
 Disallow: /forgot-password
 Disallow: /reset-password
 Disallow: /auth/
 
-# Aggressive crawlers: same rules, but slow them down as well. Google ignores
-# Crawl-delay (tune it in Search Console instead); Bing and Yandex honour it.
+# Aggressive crawlers: same rules, plus a crawl delay. A crawler obeys only the
+# most specific group that names it and ignores `*` entirely, so each group
+# must repeat the full Disallow list — a group with just Crawl-delay would let
+# these bots crawl everything above. Google ignores Crawl-delay (tune it in
+# Search Console instead); Bing and Yandex honour it.
 User-agent: bingbot
-Crawl-delay: 10
-
 User-agent: Yandex
 Crawl-delay: 10
+Disallow: /api/
+Disallow: /*?search=
+Disallow: /*?*search=
+Disallow: /*?*tags=
+Disallow: /*?*authors=
+Disallow: /*?*sort=
+Disallow: /*?*language=
+Disallow: /*?*yearStart=
+Disallow: /*?*yearEnd=
+Disallow: /*?*page=
+Disallow: /*?*magazineId=
+Disallow: /account
+Disallow: /bookmarks
+Disallow: /favorites
+Disallow: /tracker
+Disallow: /profile/edit
+Disallow: /profile$
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /auth/
 
 User-agent: AhrefsBot
-Crawl-delay: 30
-
 User-agent: SemrushBot
-Crawl-delay: 30
-
 User-agent: MJ12bot
-Crawl-delay: 30
-
 User-agent: DotBot
 Crawl-delay: 30
+Disallow: /api/
+Disallow: /*?search=
+Disallow: /*?*search=
+Disallow: /*?*tags=
+Disallow: /*?*authors=
+Disallow: /*?*sort=
+Disallow: /*?*language=
+Disallow: /*?*yearStart=
+Disallow: /*?*yearEnd=
+Disallow: /*?*page=
+Disallow: /*?*magazineId=
+Disallow: /account
+Disallow: /bookmarks
+Disallow: /favorites
+Disallow: /tracker
+Disallow: /profile/edit
+Disallow: /profile$
+Disallow: /login
+Disallow: /signup
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /auth/
 
 # Sitemap. Generated on request by pages/sitemap.xml.ts — every article, journal
 # and subject page in the archive. Must be an absolute URL per the spec.
