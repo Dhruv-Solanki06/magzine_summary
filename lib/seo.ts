@@ -4,7 +4,7 @@
 // as well as during render. Keep it free of React and of any browser globals.
 
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/brand';
-import { authorLabel, bestSummary, extractYear, magazineName } from '@/lib/format';
+import { authorLabel, bestSummary, extractYear, magazineName, recordLanguages } from '@/lib/format';
 import type { Profile } from '@/lib/profiles';
 import type { MagazineWithStats, RecordWithDetails } from '@/types';
 
@@ -57,14 +57,20 @@ const BCP47_BY_NAME: globalThis.Record<string, string> = {
   mr: 'mr', mar: 'mr', marathi: 'mr',
   ur: 'ur', urd: 'ur', urdu: 'ur',
   or: 'or', ori: 'or', odia: 'or', oriya: 'or',
+  fa: 'fa', fas: 'fa', persian: 'fa',
+  fr: 'fr', fra: 'fr', french: 'fr',
+  it: 'it', ita: 'it', italian: 'it',
+  de: 'de', deu: 'de', german: 'de',
+  zh: 'zh', zho: 'zh', chinese: 'zh',
 };
 
-export function bcp47Language(raw: string | null | undefined): string | undefined {
-  if (!raw) return undefined;
-  // Multi-language records are comma separated; inLanguage takes one value.
-  const first = raw.split(',')[0]?.trim().toLowerCase();
-  if (!first) return undefined;
-  return BCP47_BY_NAME[first];
+export function bcp47Language(names: string[]): string | undefined {
+  // inLanguage takes one value; use the first language we can map.
+  for (const name of names) {
+    const tag = BCP47_BY_NAME[name.trim().toLowerCase()];
+    if (tag) return tag;
+  }
+  return undefined;
 }
 
 /**
@@ -156,7 +162,7 @@ export function buildRecordJsonLd(record: RecordWithDetails): JsonLd {
     headline: title,
     name: title,
     isAccessibleForFree: true,
-    inLanguage: bcp47Language(record.language || record.language_legacy),
+    inLanguage: bcp47Language(recordLanguages(record)),
     publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
   };
 

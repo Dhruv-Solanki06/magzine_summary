@@ -6,7 +6,7 @@ import { buildPdfViewUrl } from './pdfLinks';
 import Cover from '@/components/common/Cover';
 import {
   formatIssueDate,
-  formatLanguage,
+  languageLabel,
   issueLabel,
   magazineName,
   magazineSlug,
@@ -29,7 +29,7 @@ const MagazineDetailsCard: React.FC<MagazineDetailsCardProps> = ({ record }) => 
   const slug = magazineSlug(record);
   const issue = issueLabel(record);
   const date = formatIssueDate(record.timestamp);
-  const language = formatLanguage(record.language_legacy);
+  const language = languageLabel(record);
 
   return (
     <div className="overflow-hidden rounded-[14px] bg-white shadow-[var(--shadow-card)] ring-1 ring-black/[0.04] lg:sticky lg:top-24">

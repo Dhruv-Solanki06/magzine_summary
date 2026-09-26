@@ -316,7 +316,7 @@ export const getServerSideProps: GetServerSideProps<MagazineDetailProps> = async
 
   const [recordsResponse, languages, selectedTags, selectedAuthors] = await Promise.all([
     fetchRecordsWithFilters({ page, pageSize: DEFAULT_PAGE_SIZE, filters, sort }),
-    fetchLanguages(),
+    fetchLanguages(magazine.id),
     getTagsByIds(tagIds),
     getAuthorsByIds(authorIds),
   ]);

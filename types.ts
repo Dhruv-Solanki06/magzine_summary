@@ -33,6 +33,11 @@ export interface Author {
   short_name: string | null;
 }
 
+export interface Language {
+  id: number;
+  name: string;
+}
+
 export interface Tag {
   id: number;
   name: string;
@@ -92,6 +97,12 @@ export interface RecordWithDetails extends Record {
   record_tags: {
     tag_id: number;
     tags: Tag;
+  }[];
+  // Normalised languages (source of truth); `language_legacy` is a derived
+  // display string kept for older rows/clients.
+  record_languages?: {
+    language_id: number;
+    languages: Language | null;
   }[];
   summaries: Summary[];
   conclusions: Conclusion[];

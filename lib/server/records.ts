@@ -9,7 +9,7 @@ import type {
   SortOption,
   Tag,
 } from '@/types';
-import { extractYear, formatLanguage } from '@/lib/format';
+import { extractYear } from '@/lib/format';
 import { withCache } from './cache';
 
 interface RecordsRequest {
@@ -33,7 +33,7 @@ export interface VolumeIssueNavItem {
 const RECORDS_CACHE_TTL = 1000 * 60 * 15; // 15 minutes
 // Lookups (languages, magazine stats) are effectively static — the archive is
 // not written to at runtime — so a short TTL only bought repeated full-table
-// scans. See fetchLanguageFacets, which pages through every row.
+// scans. See fetchLanguageFacets.
 const LOOKUP_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 // Single articles and issue navigation: immutable in practice, and hit on every
 // article page view (including by crawlers walking all 8.5k records).
@@ -57,6 +57,7 @@ export const RECORD_SELECT = `
   ${MAGAZINE_SELECT},
   record_authors ( author_id, authors (*) ),
   record_tags ( tag_id, tags (*) ),
+  record_languages ( language_id, languages ( id, name ) ),
   summaries (*),
   conclusions (*)
 `;
@@ -71,7 +72,8 @@ export const RECORD_LIST_SELECT = `
   ${RECORD_COLUMNS},
   magazines ( id, name, slug, short_name, cover_image_url, logo_image_url ),
   record_authors ( author_id, authors ( id, name ) ),
-  record_tags ( tag_id, tags ( id, name ) )
+  record_tags ( tag_id, tags ( id, name ) ),
+  record_languages ( language_id, languages ( id, name ) )
 `;
 
 // Sibling-article list in IssueNavigator. It renders only the page number, the
@@ -183,6 +185,10 @@ function stripBlobs<T extends { extracted_text?: unknown }>(rows: T[]): T[] {
     if (row && typeof row === 'object') {
       delete (row as { extracted_text?: unknown }).extracted_text;
       delete (row as { embedding?: unknown }).embedding;
+      // Language-filter join aliases (see withLanguageJoin).
+      for (const key of Object.keys(row)) {
+        if (/^lf\d+$/.test(key)) delete (row as globalThis.Record<string, unknown>)[key];
+      }
     }
   }
   return rows;
@@ -254,25 +260,54 @@ async function resolveRecordRestrictions(
   return restrictedIds;
 }
 
-async function resolveLanguageVariants(
+/**
+ * Map the `language` filter to language ids. The value is a language name
+ * ("Sanskrit"); older links may carry a combined string ("English, Sanskrit"),
+ * which now means records in *all* of those languages. Returns null when the
+ * filter is off and [] when it names no known language.
+ */
+async function resolveLanguageIds(
   supabase: SupabaseClient,
-  label: string,
-): Promise<string[]> {
+  label: string | undefined,
+): Promise<number[] | null> {
+  if (!label) return null;
+  const wanted = label
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean);
+  if (wanted.length === 0) return null;
+
   const languages = await fetchLanguageFacets(supabase);
-  const match = languages.find((l) => l.label === label);
-  return match ? match.variants : [label];
+  const ids: number[] = [];
+  for (const name of wanted) {
+    const match = languages.find((l) => l.label.toLowerCase() === name);
+    if (!match) return [];
+    ids.push(match.id);
+  }
+  return Array.from(new Set(ids));
+}
+
+/**
+ * Language filtering joins record_languages with an inner embed per language
+ * (aliased so it doesn't clobber the display embed). The embed must be part of
+ * the select, so every filtered query builds its select through this.
+ */
+function withLanguageJoin(select: string, languageIds: number[] | null): string {
+  if (!languageIds || languageIds.length === 0) return select;
+  const joins = languageIds.map((_, i) => `lf${i}:record_languages!inner(language_id)`);
+  return `${select}, ${joins.join(', ')}`;
 }
 
 function applyColumnFilters(
   inputQuery: any,
   filters: SearchFilters,
-  languageVariants: string[] | null,
+  languageIds: number[] | null,
 ) {
   let q = inputQuery;
   if (filters.magazineId) q = q.eq('magazine_id', filters.magazineId);
-  if (languageVariants && languageVariants.length > 0) {
-    q = q.in('language_legacy', languageVariants);
-  }
+  (languageIds ?? []).forEach((id, i) => {
+    q = q.eq(`lf${i}.language_id`, id);
+  });
   if (filters.yearRange?.start) {
     q = q.gte('timestamp', `${filters.yearRange.start}`);
   }
@@ -363,14 +398,14 @@ async function keywordSearch(
     query,
     filters,
     restrictedIds,
-    languageVariants,
+    languageIds,
     page,
     pageSize,
   }: {
     query: string;
     filters: SearchFilters;
     restrictedIds: number[] | null;
-    languageVariants: string[] | null;
+    languageIds: number[] | null;
     page: number;
     pageSize: number;
   },
@@ -396,13 +431,13 @@ async function keywordSearch(
   // Phase 1 — rank a cheap candidate pool (ids + title + authors only).
   let candidateQuery: any = supabase
     .from('records')
-    .select(RECORD_SEARCH_CANDIDATE_SELECT)
+    .select(withLanguageJoin(RECORD_SEARCH_CANDIDATE_SELECT, languageIds))
     .limit(SEARCH_CANDIDATE_CAP);
 
   if (restrictedIds && restrictedIds.length > 0) {
     candidateQuery = candidateQuery.in('id', restrictedIds);
   }
-  candidateQuery = applyColumnFilters(candidateQuery, filters, languageVariants);
+  candidateQuery = applyColumnFilters(candidateQuery, filters, languageIds);
   if (orClauses.length > 0) {
     candidateQuery = candidateQuery.or(orClauses.join(','));
   }
@@ -485,7 +520,7 @@ export async function fetchRecordsWithFilters({
   // every other result set — including keyword search, which previously
   // bypassed the cache entirely — is served read-through.
   if (effectiveSort !== 'random') {
-    const cacheKey = JSON.stringify({ page, pageSize, sort: effectiveSort, filters: f });
+    const cacheKey = JSON.stringify({ v: 2, page, pageSize, sort: effectiveSort, filters: f });
     return withCache(cacheKey, RECORDS_CACHE_TTL, () =>
       loadRecords(supabase, { page, pageSize, filters: f, effectiveSort }),
     );
@@ -508,9 +543,10 @@ async function loadRecords(
     effectiveSort: SortOption;
   },
 ): Promise<PaginatedResponse<RecordWithDetails>> {
-  const languageVariants = f.language
-    ? await resolveLanguageVariants(supabase, f.language)
-    : null;
+  const languageIds = await resolveLanguageIds(supabase, f.language);
+  if (languageIds && languageIds.length === 0) {
+    return { data: [], count: 0, page, pageSize, totalPages: 0 };
+  }
 
   const restrictedIds = await resolveRecordRestrictions(supabase, f);
   if (restrictedIds && restrictedIds.length === 0) {
@@ -523,7 +559,7 @@ async function loadRecords(
       query: f.searchQuery,
       filters: f,
       restrictedIds,
-      languageVariants,
+      languageIds,
       page,
       pageSize,
     });
@@ -534,16 +570,18 @@ async function loadRecords(
   // ordering stays random on every request, at no egress cost after the first.
   if (effectiveSort === 'random') {
     const poolKey = JSON.stringify({
-      pool: 'random-ids-v1',
+      pool: 'random-ids-v2',
       filters: f,
-      languageVariants,
+      languageIds,
       restrictedIds,
     });
 
     const { allIds, count } = await withCache(poolKey, RECORDS_CACHE_TTL, async () => {
-      let idsQuery: any = supabase.from('records').select('id', { count: 'exact' });
+      let idsQuery: any = supabase
+        .from('records')
+        .select(withLanguageJoin('id', languageIds), { count: 'exact' });
       if (restrictedIds && restrictedIds.length > 0) idsQuery = idsQuery.in('id', restrictedIds);
-      idsQuery = applyColumnFilters(idsQuery, f, languageVariants);
+      idsQuery = applyColumnFilters(idsQuery, f, languageIds);
 
       const { data: idRows, error: idsError, count: total } = await idsQuery;
       if (idsError) throw idsError;
@@ -562,11 +600,11 @@ async function loadRecords(
     const orderMap = new Map<number, number>();
     pageIds.forEach((id, i) => orderMap.set(id, i));
 
-    const { data, error } = await applyColumnFilters(
-      supabase.from('records').select(RECORD_LIST_SELECT).in('id', pageIds),
-      f,
-      languageVariants,
-    );
+    // pageIds already satisfy every filter; no need to re-apply them.
+    const { data, error } = await supabase
+      .from('records')
+      .select(RECORD_LIST_SELECT)
+      .in('id', pageIds);
     if (error) throw error;
 
     const records = finalizeRecords(data).sort(
@@ -583,9 +621,11 @@ async function loadRecords(
     };
   }
 
-  let query: any = supabase.from('records').select(RECORD_LIST_SELECT, { count: 'exact' });
+  let query: any = supabase
+    .from('records')
+    .select(withLanguageJoin(RECORD_LIST_SELECT, languageIds), { count: 'exact' });
   if (restrictedIds && restrictedIds.length > 0) query = query.in('id', restrictedIds);
-  query = applyColumnFilters(query, f, languageVariants);
+  query = applyColumnFilters(query, f, languageIds);
   query = applySorting(query, effectiveSort);
 
   const from = (page - 1) * pageSize;
@@ -635,7 +675,7 @@ export async function fetchRecordWithDetailsById(
   id: number,
 ): Promise<RecordWithDetails | null> {
   return withCache(
-    JSON.stringify({ record: 'detail-v1', id }),
+    JSON.stringify({ record: 'detail-v2', id }),
     RECORD_DETAIL_CACHE_TTL,
     async () => {
       const supabase = getSupabaseClient();
@@ -708,7 +748,7 @@ export async function fetchRelatedRecords(
   if (!firstTag && !record.magazine_id) return [];
 
   const cacheKey = JSON.stringify({
-    related: 'v1',
+    related: 'v2',
     tag: firstTag ?? null,
     magazine: firstTag ? null : record.magazine_id,
     limit,
@@ -865,59 +905,74 @@ export async function fetchMagazineBySlug(
 /* -------------------------------------------------------------------------- */
 
 export interface LanguageFacet {
+  id: number;
   label: string;
-  variants: string[];
   count: number;
 }
 
 /**
- * Language filter options, derived by scanning `language_legacy` across the
- * whole table (there is no distinct-value endpoint in PostgREST). That is ~9
- * paged requests over 8.5k rows, so it must stay behind the 24h lookup cache —
- * the values only change when the archive is re-imported.
+ * Language filter options: one entry per row of the normalised `languages`
+ * table, with its record count. (This used to group raw `language_legacy`
+ * strings, which made every combination — "English, Sanskrit" — an option.)
  */
 async function fetchLanguageFacets(supabase: SupabaseClient): Promise<LanguageFacet[]> {
-  return withCache(JSON.stringify({ facet: 'languages-v1' }), LOOKUP_CACHE_TTL, () =>
-    loadLanguageFacets(supabase),
+  return withCache(JSON.stringify({ facet: 'languages-v2' }), LOOKUP_CACHE_TTL, async () => {
+    const { data, error } = await supabase
+      .from('languages')
+      .select('id, name, record_languages(count)');
+    if (error) throw error;
+
+    type Row = { id: number; name: string; record_languages: { count: number }[] | null };
+    return ((data ?? []) as Row[])
+      .map((row) => ({
+        id: row.id,
+        label: row.name.trim(),
+        count: row.record_languages?.[0]?.count ?? 0,
+      }))
+      .filter((l) => l.count > 0)
+      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  });
+}
+
+/**
+ * Language options scoped to one magazine, so its page only offers languages
+ * it actually publishes in, with per-magazine counts.
+ */
+async function fetchMagazineLanguageFacets(
+  supabase: SupabaseClient,
+  magazineId: number,
+): Promise<LanguageFacet[]> {
+  return withCache(
+    JSON.stringify({ facet: 'magazine-languages-v1', magazineId }),
+    LOOKUP_CACHE_TTL,
+    async () => {
+      const all = await fetchLanguageFacets(supabase);
+      const counts = new Map<number, number>();
+      const pageSize = 1000;
+      for (let start = 0; ; start += pageSize) {
+        const { data, error } = await supabase
+          .from('record_languages')
+          .select('language_id, records!inner(magazine_id)')
+          .eq('records.magazine_id', magazineId)
+          .range(start, start + pageSize - 1);
+        if (error) throw error;
+        const rows = (data ?? []) as { language_id: number }[];
+        rows.forEach((r) => counts.set(r.language_id, (counts.get(r.language_id) ?? 0) + 1));
+        if (rows.length < pageSize) break;
+      }
+      return all
+        .filter((l) => counts.has(l.id))
+        .map((l) => ({ ...l, count: counts.get(l.id) ?? 0 }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    },
   );
 }
 
-async function loadLanguageFacets(supabase: SupabaseClient): Promise<LanguageFacet[]> {
-  // Pull the raw language values in pages (client caps at 1000 rows/request).
-  const raw: (string | null)[] = [];
-  const pageSize = 1000;
-  for (let start = 0; ; start += pageSize) {
-    const { data, error } = await supabase
-      .from('records')
-      .select('language_legacy')
-      .range(start, start + pageSize - 1);
-    if (error) throw error;
-    const rows = data ?? [];
-    raw.push(...rows.map((r) => r.language_legacy as string | null));
-    if (rows.length < pageSize) break;
-  }
-
-  const groups = new Map<string, { variants: Set<string>; count: number }>();
-  for (const value of raw) {
-    if (!value) continue;
-    const label = formatLanguage(value) || value;
-    const entry = groups.get(label) ?? { variants: new Set<string>(), count: 0 };
-    entry.variants.add(value);
-    entry.count += 1;
-    groups.set(label, entry);
-  }
-
-  return Array.from(groups.entries())
-    .map(([label, { variants, count }]) => ({
-      label,
-      variants: Array.from(variants),
-      count,
-    }))
-    .sort((a, b) => b.count - a.count);
-}
-
-export async function fetchLanguages(): Promise<LanguageFacet[]> {
-  return fetchLanguageFacets(getSupabaseClient());
+export async function fetchLanguages(magazineId?: number): Promise<LanguageFacet[]> {
+  const supabase = getSupabaseClient();
+  return magazineId
+    ? fetchMagazineLanguageFacets(supabase, magazineId)
+    : fetchLanguageFacets(supabase);
 }
 
 async function fetchLookup<T>(table: 'tags' | 'authors', ttl: number): Promise<T[]> {

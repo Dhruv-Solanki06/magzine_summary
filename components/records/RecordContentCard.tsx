@@ -17,7 +17,7 @@ import {
   bestConclusion,
   bestSummary,
   formatIssueDate,
-  formatLanguage,
+  languageLabel,
   issueLabel,
 } from '@/lib/format';
 
@@ -45,7 +45,7 @@ const RecordContentCard: React.FC<RecordContentCardProps> = ({
   const hasAuthorRecords = (record.record_authors?.length ?? 0) > 0;
   const issue = issueLabel(record);
   const date = formatIssueDate(record.timestamp);
-  const language = formatLanguage(record.language_legacy);
+  const language = languageLabel(record);
   const meta = [
     issue ? { icon: Layers, label: issue } : null,
     date ? { icon: CalendarDays, label: date } : null,

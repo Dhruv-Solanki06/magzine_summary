@@ -1,31 +1,50 @@
 // lib/format.ts — small display helpers shared across the UI.
 import type { RecordWithDetails } from '@/types';
 
+// Only used for rows that predate the normalised `record_languages` data.
 const LANGUAGE_LABELS: globalThis.Record<string, string> = {
   hin: 'Hindi',
   hindi: 'Hindi',
   eng: 'English',
   english: 'English',
-  npi: 'Nepali',
-  mag: 'Magahi',
-  lin: 'Lingala',
+  guj: 'Gujarati',
   gujarati: 'Gujarati',
+  san: 'Sanskrit',
   sanskrit: 'Sanskrit',
+  pra: 'Prakrit',
   prakrit: 'Prakrit',
+  kan: 'Kannada',
   kannada: 'Kannada',
 };
 
-/** Normalise the many spellings/casings of language_legacy into a display label. */
-export function formatLanguage(raw: string | null | undefined): string {
-  if (!raw) return '';
-  return raw
-    .split(',')
-    .map((part) => {
-      const key = part.trim().toLowerCase();
-      return LANGUAGE_LABELS[key] ?? part.trim();
-    })
+/** Split a legacy language string ("English, Sanskrit", "hin") into display names. */
+function parseLegacyLanguages(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  const names = raw
+    .split(/\s*(?:,|&|\/|\.|\band\b)\s*/i)
+    .map((part) => part.replace(/[`"[\]]/g, '').trim())
     .filter(Boolean)
-    .join(', ');
+    .map((part) => LANGUAGE_LABELS[part.toLowerCase()] ?? part);
+  return Array.from(new Set(names));
+}
+
+/** A record's languages, from the normalised relation when present. */
+export function recordLanguages(record: {
+  record_languages?: RecordWithDetails['record_languages'];
+  language_legacy?: string | null;
+}): string[] {
+  const linked = (record.record_languages ?? [])
+    .map((rl) => rl.languages?.name?.trim())
+    .filter((name): name is string => Boolean(name));
+  if (linked.length > 0) {
+    return Array.from(new Set(linked)).sort((a, b) => a.localeCompare(b));
+  }
+  return parseLegacyLanguages(record.language_legacy);
+}
+
+/** Display label for a record's languages: "English, Sanskrit". */
+export function languageLabel(record: Parameters<typeof recordLanguages>[0]): string {
+  return recordLanguages(record).join(', ');
 }
 
 /** Pull a 4-digit year out of the free-form timestamp ("1998", "April 1985"). */

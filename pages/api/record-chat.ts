@@ -6,7 +6,7 @@ import {
   bestConclusion,
   bestSummary,
   formatIssueDate,
-  formatLanguage,
+  languageLabel,
   issueLabel,
   magazineName,
 } from '@/lib/format';
@@ -71,7 +71,7 @@ function buildRecordContext(record: RecordWithDetails, sameIssue: RecordWithDeta
     record.timestamp ? `Publication date: ${formatIssueDate(record.timestamp)}` : '',
     record.page_numbers ? `Pages: ${record.page_numbers}` : '',
     authorLabel(record) ? `Authors: ${authorLabel(record)}` : '',
-    formatLanguage(record.language_legacy) ? `Language: ${formatLanguage(record.language_legacy)}` : '',
+    languageLabel(record) ? `Language: ${languageLabel(record)}` : '',
     tags.length ? `Topics: ${tags.join(', ')}` : '',
     bestSummary(record) ? `Summary:\n${bestSummary(record)}` : '',
     bestConclusion(record) ? `Conclusion:\n${bestConclusion(record)}` : '',
